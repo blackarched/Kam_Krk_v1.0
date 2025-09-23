@@ -1,0 +1,19 @@
+[Unit]
+Description=Privileged ARP Scanner socket
+Documentation=man:systemd.socket(7)
+
+[Socket]
+# Create a filesystem UNIX domain socket at /run/priv_scanner.sock
+ListenStream=/run/priv_scanner.sock
+
+# Make the socket accessible to the webserver user group (www-data) only.
+# The socket is created by systemd with these ownership/mode settings.
+SocketUser=root
+SocketGroup=www-data
+SocketMode=0660
+
+# Optional: limit number of pending connections
+Backlog=5
+
+[Install]
+WantedBy=sockets.target

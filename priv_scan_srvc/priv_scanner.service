@@ -1,0 +1,27 @@
+[Unit]
+Description=Privileged ARP Scanner Service
+After=network.target
+Requires=priv_scanner.socket
+
+[Service]
+Type=simple
+# Run as root so it can perform privileged network operations (ARP).
+User=root
+Group=root
+
+# Security hardening options (recommended)
+ProtectSystem=full
+PrivateTmp=true
+NoNewPrivileges=true
+ReadOnlyDirectories=/
+ReadWriteDirectories=/run
+
+# The absolute path to the Python script
+ExecStart=/usr/bin/python3 /usr/local/bin/privileged_scanner_service.py --socket /run/priv_scanner.sock
+
+# Restart on unexpected exit (tunable)
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target

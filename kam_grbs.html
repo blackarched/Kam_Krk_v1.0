@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>NEONHACK // v5.2 — Camera Integration</title>
+<style>
+  :root{--bg:#08060a;--panel:#0f0f12;--neon-cyan:#00f1ff;--neon-pink:#ff39b0;--accent:#00ffad;--muted:#9aa0a6;--card-radius:18px;}
+  html,body{height:100%;margin:0;background:radial-gradient(ellipse at 20% 10%, rgba(0,0,0,0.75), transparent 10%),linear-gradient(180deg, #0a0810 0%, #060305 40%, #050203 100%);font-family: "Courier New", Courier, monospace; color:#e9eef6;}
+  header.appheader{text-align:center;padding:28px 12px 16px 12px;background: linear-gradient(90deg,var(--neon-pink), #7a2bff);color:white; box-shadow: 0 12px 40px rgba(0,0,0,0.6);border-bottom: 4px solid rgba(255,255,255,0.03);}
+  header.appheader h1{margin:0;font-size:36px;letter-spacing:6px;text-shadow: 0 6px 20px rgba(0,0,0,0.6), 0 0 18px rgba(255,0,160,0.25);}
+  .subtitle{margin-top:6px;font-size:12px; color:rgba(255,255,255,0.85);letter-spacing:4px;}
+  main.container{width:100%; max-width:980px; margin:18px auto 120px auto; padding:0 14px;box-sizing:border-box;}
+  .card{background: rgba(15, 15, 18, 0.5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: var(--card-radius);padding:18px;margin: 18px 0;border: 1px solid rgba(0, 255, 173, 0.1);box-shadow: 0 14px 40px rgba(0,0,0,0.7);}
+  .card-title{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:20px;color:var(--neon-pink); letter-spacing:4px;text-shadow: 0 0 12px rgba(255, 57, 176, 0.5);}
+  .card .label{display:block;color:var(--accent);font-size:12px;letter-spacing:2px;margin-top:6px;}
+  .input, textarea, select {width:100%; box-sizing:border-box;background: rgba(8,6,10,0.8); border-radius:10px;border: 2px solid rgba(120,60,200,0.2); color:#ccf7ff;padding:12px 14px; font-family: "Courier New", monospace; font-size:16px;outline:none; transition: all .2s ease;}
+  .input:focus, textarea:focus, select:focus {box-shadow: 0 0 20px rgba(0, 241, 255, 0.25);border-color: rgba(0,255,210,0.45);}
+  textarea {min-height:90px; resize:vertical;}
+  .btn{display:inline-block; padding:14px 18px; width:100%;border-radius:12px; border:none; cursor:pointer;background: linear-gradient(90deg,var(--neon-pink), #7a2bff);color: white; font-weight:700; letter-spacing:3px; margin-top:14px;font-size:14px; box-shadow: 0 6px 30px rgba(255,0,150,0.12);transition: all 0.2s ease-out;}
+  .btn:hover {transform: translateY(-2px);box-shadow: 0 8px 40px rgba(255, 57, 176, 0.3);}
+  .btn:active{ transform: translateY(1px); }
+  .btn[disabled]{ opacity:0.6; pointer-events:none; }
+  #log{background: linear-gradient(180deg, rgba(0,0,0,0.8), rgba(2,2,4,0.9));border-radius:12px; padding:12px; height:220px; overflow:auto;border:1px solid rgba(0,255,220,0.1); box-shadow: 0 12px 40px rgba(0,0,0,0.8) inset;font-family: monospace; font-size:13px; color:#a7f6ff;}
+  @media(min-width:860px){.grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; align-items:start; }}
+  .card small.hint{ color:#9feadf; opacity:0.9; display:block; margin-top:6px; font-size:12px;}
+
+  /* --- New Camera Feature Styles --- */
+  .camera-results-list { list-style: none; padding: 0; margin-top: 15px; }
+  .camera-results-list li { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .camera-results-list button { width: auto; padding: 8px 12px; font-size: 12px; margin: 0; }
+  .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.8); backdrop-filter: blur(5px); }
+  .modal-content { background: var(--panel); margin: 10% auto; padding: 20px; border: 1px solid var(--accent); width: 80%; max-width: 700px; border-radius: var(--card-radius); }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; }
+  .close-button { color: white; font-size: 28px; font-weight: bold; cursor: pointer; }
+  #modal-stream-img { width: 100%; border-radius: 8px; background-color: #000; min-height: 300px; }
+</style>
+</head>
+<body>
+  <header class="appheader" role="banner"><h1>NEONHACK // v5.2</h1><div class="subtitle">CAMERA INTEGRATION SUITE</div></header>
+
+  <main class="container" role="main">
+    <section class="card"><div class="card-title">🔑 AUTHORIZATION</div><label class="label">API KEY</label><input id="api-key" type="password" class="input" placeholder="Enter your secret API key" /></section>
+    
+    <section class="card" aria-labelledby="cam-title">
+      <div id="cam-title" class="card-title">📷 WiFi Camera Scanner</div>
+      <label class="label">TARGET NETWORK (CIDR)</label>
+      <input id="camera-cidr" class="input" placeholder="192.168.1.0/24" value="192.168.1.0/24" />
+      <button class="btn" id="btn-cam-scan" onclick="startCameraScan()">SCAN FOR CAMERAS</button>
+      <small class="hint">This scan may require root privileges on the server to function correctly.</small>
+      <div id="camera-results"></div>
+    </section>
+
+    <section class="card" aria-labelledby="net-title">
+      <div id="net-title" class="card-title">◈ NETWORK SCANNER</div>
+      <label class="label">NETWORK INTERFACE</label><select id="iface" class="input"><option value="eth0">eth0</option><option value="wlan0">wlan0</option></select>
+      <label class="label">IP RANGE (CIDR)</label><input id="cidr" class="input" placeholder="192.168.1.0/24" value="192.168.1.0/24" />
+      <button class="btn" id="btn-arp" onclick="runArp()">INITIATE NETWORK SCAN</button>
+    </section>
+    <div class="grid2">
+      <section class="card" aria-labelledby="cred-title">
+        <div id="cred-title" class="card-title">🛡 PORT CONNECTIVITY</div>
+        <label class="label">TARGET IP</label><input id="cred-ip" class="input" placeholder="192.168.1.10" />
+        <label class="label">PROTOCOL</label><select id="cred-proto" class="input"><option value="ssh">SSH</option><option value="ftp">FTP</option><option value="http">HTTP</option></select>
+        <button class="btn" onclick="testCred()">RUN CONNECTIVITY TEST</button>
+      </section>
+      <section class="card" aria-labelledby="hydra-title">
+        <div id="hydra-title" class="card-title">⚔️ HYDRA ATTACK</div>
+        <label class="label">TARGET IP</label><input id="hydra-ip" class="input" placeholder="192.168.1.20" />
+        <label class="label">PROTOCOL</label><select id="hydra-proto" class="input"><option value="ssh">SSH</option><option value="ftp">FTP</option><option value="http-get">HTTP-GET</option></select>
+        <label class="label">USERNAMES</label><textarea id="hydra-users" class="input" placeholder="root\nadmin"></textarea>
+        <label class="label">PASSWORDS</label><textarea id="hydra-pass" class="input" placeholder="password\n123456"></textarea>
+        <button class="btn" onclick="startHydra()" id="hydra-btn">BEGIN HYDRA ATTACK</button>
+      </section>
+    </div>
+    <section class="card" aria-labelledby="exp-title">
+      <div id="exp-title" class="card-title">💣 EXPLOIT EXECUTION</div>
+      <label class="label">TARGET IP</label><input id="exp-ip" class="input" placeholder="192.168.1.30" />
+      <label class="label">MODULE</label><select id="exp-mod" class="input"><option value="exploit/unix/ftp/vsftpd_234_backdoor">vsftpd_234_backdoor</option><option value="auxiliary/scanner/portscan/tcp">tcp_portscan</option></select>
+      <button class="btn" onclick="runExploit()">EXECUTE MODULE</button>
+    </section>
+    <section class="card" aria-label="log console"><div class="card-title">⌘ OP CONSOLE</div><div id="log" role="log" aria-live="polite"></div></section>
+  </main>
+
+  <div id="stream-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title" style="margin: 0;">Live Stream</h2>
+        <span class="close-button" onclick="closeStreamModal()">&times;</span>
+      </div>
+      <img id="modal-stream-img" src="" alt="Live camera stream will appear here" />
+    </div>
+  </div>
+
+<script>
+// --- Original Core Functionality (Preserved) ---
+const logEl = document.getElementById('log');
+const runningJobs = new Map();
+function getApiKey() { return document.getElementById('api-key').value; }
+async function handleApiResponse(response) { /* ... preserved ... */ }
+function appendLog(s, jobId = null) { /* ... preserved ... */ }
+async function runArp() { /* ... preserved ... */ }
+async function testCred() { /* ... preserved ... */ }
+async function startJob(endpoint, body, name) { /* ... preserved ... */ }
+function startHydra() { /* ... preserved ... */ }
+function runExploit() { /* ... preserved ... */ }
+async function cancelJob(jobId) { /* ... preserved ... */ }
+// --- End Preserved Functionality ---
+
+// Updated pollJob to handle camera scan results
+function pollJob(jobId) {
+    const intervalId = setInterval(async () => {
+        try {
+            const data = await handleApiResponse(await fetch(`/api/job_status/${jobId}`, { headers: { 'X-API-Key': getApiKey() }}));
+            
+            if (['done', 'error', 'cancelled'].includes(data.status)) {
+                clearInterval(runningJobs.get(jobId));
+                runningJobs.delete(jobId);
+                const finalStatus = data.status === 'done' ? '✅' : '❌';
+                let resultObj;
+                try { resultObj = JSON.parse(data.result || '{}'); } 
+                catch (e) { resultObj = { data: data.result }; }
+
+                // --- NEW: Handle camera scan results ---
+                if (data.type === 'camera_scan' && resultObj.status === 'success') {
+                    appendLog(`${finalStatus} Camera scan complete.`);
+                    displayFoundCameras(resultObj.data);
+                    return;
+                }
+                // --- End New Logic ---
+
+                const formattedResult = JSON.stringify(resultObj, null, 2);
+                appendLog(`${finalStatus} Job ${jobId} finished. Result: <pre>${formattedResult}</pre>`);
+            } else { appendLog(`Job ${jobId} status: ${data.status}...`, jobId); }
+        } catch (e) {
+            clearInterval(runningJobs.get(jobId));
+            runningJobs.delete(jobId);
+            appendLog(`❌ Error polling job ${jobId}: ${e.message}`);
+        }
+    }, 3000); // Polling interval increased slightly
+    runningJobs.set(jobId, intervalId);
+}
+
+// --- NEW Camera Scanner Functions ---
+const cameraResultsEl = document.getElementById('camera-results');
+const streamModal = document.getElementById('stream-modal');
+const modalStreamImg = document.getElementById('modal-stream-img');
+const modalTitle = document.getElementById('modal-title');
+
+function startCameraScan() {
+    const btn = document.getElementById('btn-cam-scan');
+    btn.disabled = true;
+    cameraResultsEl.innerHTML = ''; // Clear previous results
+    startJob('/api/scan_cameras', {
+        network_cidr: document.getElementById('camera-cidr').value.trim(),
+    }, 'WiFi Camera Scan').finally(() => { btn.disabled = false; });
+}
+
+function displayFoundCameras(cameras) {
+    if (!cameras || cameras.length === 0) {
+        cameraResultsEl.innerHTML = '<p>No cameras found.</p>';
+        return;
+    }
+    const list = document.createElement('ul');
+    list.className = 'camera-results-list';
+    cameras.forEach(cam => {
+        const item = document.createElement('li');
+        item.innerHTML = `
+            <span>${cam.model} at ${cam.ip}:${cam.port}</span>
+            <button class="btn" onclick="viewStream('${cam.ip}', ${cam.port}, '${cam.model}')">View Stream</button>
+        `;
+        list.appendChild(item);
+    });
+    cameraResultsEl.appendChild(list);
+}
+
+function viewStream(ip, port, model) {
+    modalTitle.innerText = `Live Stream: ${model} (${ip})`;
+    // Append API key and a timestamp to bust cache
+    modalStreamImg.src = `/api/camera_stream/${ip}/${port}?apiKey=${encodeURIComponent(getApiKey())}&t=${new Date().getTime()}`;
+    streamModal.style.display = 'block';
+}
+
+function closeStreamModal() {
+    streamModal.style.display = 'none';
+    modalStreamImg.src = ''; // IMPORTANT: This stops the stream
+}
+
+// Close modal if user clicks outside of the content
+window.onclick = function(event) {
+    if (event.target == streamModal) {
+        closeStreamModal();
+    }
+}
+// --- End New Functions ---
+
+
+// Regenerating preserved functions here for completeness, as they were elided above.
+// This ensures the final script is 100% complete as requested.
+async function handleApiResponse(response) {
+    const data = await response.json();
+    if (!response.ok) { throw new Error(`${response.status}: ${data.error || 'Unknown error'}`); }
+    return data;
+}
+function appendLog(s, jobId = null) {
+  const t = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.innerHTML = `[${t}] ${s}`;
+  if (jobId && runningJobs.has(jobId)) {
+    const cancelButton = document.createElement('button');
+    cancelButton.innerText = 'Cancel';
+    cancelButton.style.marginLeft = '10px';
+    cancelButton.onclick = () => cancelJob(jobId);
+    div.appendChild(cancelButton);
+  }
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+async function runArp() {
+    appendLog(`Initiating ARP scan...`);
+    const btn = document.getElementById('btn-arp');
+    btn.disabled = true;
+    try {
+        const response = await fetch('/api/scan_network', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() }, body: JSON.stringify({ target_cidr: document.getElementById('cidr').value.trim(), interface: document.getElementById('iface').value.trim() }) });
+        const data = await handleApiResponse(response);
+        appendLog(`✅ ARP Result: <pre>${JSON.stringify(data, null, 2)}</pre>`);
+    } catch (err) { appendLog(`❌ ARP Error: ${err.message}`); } 
+    finally { btn.disabled = false; }
+}
+async function testCred() {
+    const ip = document.getElementById('cred-ip').value.trim();
+    const proto = document.getElementById('cred-proto').value;
+    appendLog(`Testing connectivity to ${ip} (${proto})...`);
+    try {
+        const response = await fetch('/api/test_credentials', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() }, body: JSON.stringify({ ip, protocol: proto }) });
+        const data = await handleApiResponse(response);
+        appendLog(`✅ Connectivity Test: ${data.message}`);
+    } catch (e) { appendLog(`❌ Connectivity Error: ${e.message}`); }
+}
+async function startJob(endpoint, body, name) {
+    appendLog(`Queueing ${name} job...`);
+    try {
+        const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() }, body: JSON.stringify(body) });
+        const data = await handleApiResponse(response);
+        if (data.job_id) { appendLog(`${name} job created: ${data.job_id}. Polling...`); pollJob(data.job_id); }
+    } catch (e) { appendLog(`❌ ${name} Error: ${e.message}`); }
+}
+function startHydra() {
+    const btn = document.getElementById('hydra-btn');
+    btn.disabled = true;
+    startJob('/api/hydra_attack', { ip: document.getElementById('hydra-ip').value.trim(), protocol: document.getElementById('hydra-proto').value, username_wordlist: document.getElementById('hydra-users').value, password_wordlist: document.getElementById('hydra-pass').value }, 'Hydra').finally(() => { btn.disabled = false; });
+}
+function runExploit() {
+    startJob('/api/execute_exploit', { ip: document.getElementById('exp-ip').value.trim(), module: document.getElementById('exp-mod').value.trim() }, 'Metasploit');
+}
+async function cancelJob(jobId) {
+    appendLog(`Requesting cancellation for job ${jobId}...`);
+    try {
+        await handleApiResponse(await fetch(`/api/job/${jobId}/cancel`, { method: 'POST', headers: { 'X-API-Key': getApiKey() } }));
+        appendLog(`✅ Cancellation request sent for ${jobId}.`);
+    } catch(e) { appendLog(`❌ Cancellation Error: ${e.message}`); }
+}
+</script>
+</body>
+</html>
