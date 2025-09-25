@@ -32,7 +32,7 @@ class Config:
     SECRET_API_KEY = os.environ.get("NEONHACK_API_KEY", "change-this-insecure-default-key")
     MSF_PASSWORD = os.environ.get("MSF_PASSWORD", "msf_rpc_password")
     DATABASE_PATH = "jobs.db"
-    PRIV_SOCKET_PATH = "/tmp/priv_scanner.sock"
+    PRIV_SOCKET_PATH = "/run/priv_scanner.sock"
     
     ALLOWED_SCAN_SUBNETS = [
         ipaddress.ip_network("192.168.1.0/24"),
@@ -191,7 +191,7 @@ def run_camera_scan_in_background(job_id, network_cidr):
 
 # --- 7. API Endpoints ---
 @app.route('/')
-def index(): return render_template('kam_grbs5.html')
+def index(): return render_template('kam_grbs.html')
 
 @app.route('/api/scan_network', methods=['POST'])
 @require_api_key
