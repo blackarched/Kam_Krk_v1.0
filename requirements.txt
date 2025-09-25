@@ -1,0 +1,5 @@
+Flask==2.3.3
+requests==2.31.0
+scapy==2.5.0
+opencv-python==4.10.0.84
+pymetasploit3==1.0.3

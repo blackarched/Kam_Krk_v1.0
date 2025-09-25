@@ -1,7 +1,6 @@
 [Unit]
 Description=Privileged ARP Scanner Service
 After=network.target
-Requires=priv_scanner.socket
 
 [Service]
 Type=simple

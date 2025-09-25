@@ -153,6 +153,7 @@ function startCameraScan() {
     cameraResultsEl.innerHTML = ''; // Clear previous results
     startJob('/api/scan_cameras', {
         network_cidr: document.getElementById('camera-cidr').value.trim(),
+        interface: document.getElementById('iface').value.trim()
     }, 'WiFi Camera Scan').finally(() => { btn.disabled = false; });
 }
 
