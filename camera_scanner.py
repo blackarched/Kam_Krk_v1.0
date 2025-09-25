@@ -1,7 +1,6 @@
 # camera_scanner.py
 import requests
 import re
-from scapy.all import srp, Ether, ARP
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
@@ -17,17 +16,34 @@ PROBE_PORTS = [80, 8080, 88, 554] # Common web interface and RTSP ports
 
 def network_scan(network_cidr):
     """
-    Performs a more reliable ARP scan using Scapy's srp function.
-    NOTE: This function requires root privileges to craft raw packets.
+    Performs ARP scan by communicating with the privileged scanner service.
+    This avoids duplicating privileged operations.
     """
-    logging.info(f"Initiating ARP scan for WiFi cameras on {network_cidr}...")
+    import socket
+    import json
+    
+    logging.info(f"Requesting ARP scan for WiFi cameras on {network_cidr}...")
     try:
-        ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=network_cidr), timeout=3, verbose=0)
-        devices = [{'ip': rcv.psrc, 'mac': rcv.hwsrc} for snd, rcv in ans]
-        logging.info(f"ARP scan found {len(devices)} devices.")
-        return devices
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.connect("/run/priv_scanner.sock")
+            s.sendall(json.dumps({
+                "target_cidr": network_cidr, 
+                "interface": "eth0"  # Default interface
+            }).encode('utf-8'))
+            s.shutdown(socket.SHUT_WR)
+            
+            response = b""
+            while True:
+                chunk = s.recv(4096)
+                if not chunk:
+                    break
+                response += chunk
+            
+            devices = json.loads(response.decode('utf-8'))
+            logging.info(f"ARP scan found {len(devices)} devices.")
+            return devices
     except Exception as e:
-        logging.error(f"ARP scan failed. This part of the script likely needs to be run with root privileges. Error: {e}")
+        logging.error(f"Failed to communicate with privileged scanner service: {e}")
         return []
 
 def detect_camera_model(device_ip):

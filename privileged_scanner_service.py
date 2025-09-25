@@ -22,6 +22,7 @@ import argparse
 import os
 import json
 import socket
+import stat
 import struct
 import sys
 import ipaddress
