@@ -169,6 +169,22 @@ function getApiKey() {
     return document.getElementById('api-key').value;
 }
 
+function setButtonLoading(button, loading = true) {
+    if (!button) return;
+    
+    if (loading) {
+        button.disabled = true;
+        button.dataset.originalText = button.textContent;
+        button.textContent = button.textContent + ' ⏳';
+    } else {
+        button.disabled = false;
+        if (button.dataset.originalText) {
+            button.textContent = button.dataset.originalText;
+            delete button.dataset.originalText;
+        }
+    }
+}
+
 function appendLog(s, jobId = null) {
   const t = new Date().toLocaleTimeString();
   const div = document.createElement('div');
@@ -188,25 +204,51 @@ function appendLog(s, jobId = null) {
 }
 
 async function handleApiResponse(response) {
-    const data = await response.json();
+    let data;
+    try {
+        data = await response.json();
+    } catch (e) {
+        throw new Error(`${response.status}: Invalid JSON response from server`);
+    }
+    
     if (!response.ok) {
-        const errorMsg = data.error || 'Unknown error';
+        const errorMsg = data.error || data.message || 'Unknown error';
         const errorDetails = data.details ? ` Details: ${JSON.stringify(data.details)}` : '';
-        throw new Error(`${response.status}: ${errorMsg}${errorDetails}`);
+        throw new Error(`Server Error (${response.status}): ${errorMsg}${errorDetails}`);
     }
     return data;
 }
 
+function toCIDR(value) {
+    if (value.includes('/')) return value;
+    // assume single host -> make /32
+    return value + '/32';
+}
+
 async function runArp() {
-    appendLog(`Initiating ARP scan...`);
     const btn = document.getElementById('btn-arp');
-    btn.disabled = true;
+    
+    // Validate API key
+    if (!getApiKey()) {
+        appendLog(`❌ API key is required`);
+        return;
+    }
+    
+    appendLog(`Initiating ARP scan...`);
+    setButtonLoading(btn, true);
+    
     try {
+        const scanValue = document.getElementById('cidr').value.trim();
+        if (!scanValue) {
+            appendLog(`❌ Network CIDR is required`);
+            return;
+        }
+        
         const response = await fetch('/api/scan_network', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() },
             body: JSON.stringify({
-                target_cidr: document.getElementById('cidr').value.trim(),
+                target_cidr: toCIDR(scanValue),
                 interface: document.getElementById('iface').value.trim()
             })
         });
@@ -215,14 +257,28 @@ async function runArp() {
     } catch (err) {
         appendLog(`❌ ARP Error: ${err.message}`);
     } finally {
-        btn.disabled = false;
+        setButtonLoading(btn, false);
     }
 }
 
 async function testCred() {
+    const btn = document.querySelector('button[onclick="testCred()"]');
     const ip = document.getElementById('cred-ip').value.trim();
     const proto = document.getElementById('cred-proto').value;
+    
+    // Validate inputs
+    if (!getApiKey()) {
+        appendLog(`❌ API key is required`);
+        return;
+    }
+    if (!ip) {
+        appendLog(`❌ Target IP is required`);
+        return;
+    }
+    
     appendLog(`Testing connectivity to ${ip} (${proto})...`);
+    setButtonLoading(btn, true);
+    
     try {
         const response = await fetch('/api/test_credentials', {
             method: 'POST',
@@ -233,24 +289,49 @@ async function testCred() {
         appendLog(`✅ Connectivity Test: ${data.message}`);
     } catch (e) {
         appendLog(`❌ Connectivity Error: ${e.message}`);
+    } finally {
+        setButtonLoading(btn, false);
     }
 }
 
 async function startHydra() {
+    const btn = document.getElementById('hydra-btn');
     const ip = document.getElementById('hydra-ip').value.trim();
     const proto = document.getElementById('hydra-proto').value;
     const users = document.getElementById('hydra-users').value.trim();
     const pass = document.getElementById('hydra-pass').value.trim();
+    
+    // Validate inputs
+    if (!getApiKey()) {
+        appendLog(`❌ API key is required`);
+        return;
+    }
+    if (!ip) {
+        appendLog(`❌ Target IP is required`);
+        return;
+    }
+    if (!users) {
+        appendLog(`❌ Username wordlist is required`);
+        return;
+    }
+    if (!pass) {
+        appendLog(`❌ Password wordlist is required`);
+        return;
+    }
+    
     appendLog(`Queueing Hydra attack on ${ip} (${proto})...`);
-    const btn = document.getElementById('hydra-btn');
-    btn.disabled = true;
+    setButtonLoading(btn, true);
+    
     try {
         const response = await fetch('/api/hydra_attack', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() },
             body: JSON.stringify({
-                ip, protocol: proto,
-                username_wordlist: users, password_wordlist: pass
+                ip: ip,
+                protocol: proto,
+                username_wordlist: users,
+                password_wordlist: pass,
+                timeout: 300
             })
         });
         const data = await handleApiResponse(response);
@@ -261,14 +342,32 @@ async function startHydra() {
     } catch (e) {
         appendLog(`❌ Hydra Error: ${e.message}`);
     } finally {
-        btn.disabled = false;
+        setButtonLoading(btn, false);
     }
 }
 
 async function runExploit() {
+    const btn = document.querySelector('button[onclick="runExploit()"]');
     const ip = document.getElementById('exp-ip').value.trim();
     const module = document.getElementById('exp-mod').value.trim();
+    
+    // Validate inputs
+    if (!getApiKey()) {
+        appendLog(`❌ API key is required`);
+        return;
+    }
+    if (!ip) {
+        appendLog(`❌ Target IP is required`);
+        return;
+    }
+    if (!module) {
+        appendLog(`❌ Exploit module is required`);
+        return;
+    }
+    
     appendLog(`Queueing Metasploit job: ${module} on ${ip}...`);
+    setButtonLoading(btn, true);
+    
     try {
         const response = await fetch('/api/execute_exploit', {
             method: 'POST',
@@ -282,6 +381,8 @@ async function runExploit() {
         }
     } catch (e) {
         appendLog(`❌ Exploit Error: ${e.message}`);
+    } finally {
+        setButtonLoading(btn, false);
     }
 }
 

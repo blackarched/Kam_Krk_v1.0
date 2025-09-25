@@ -149,11 +149,25 @@ const modalTitle = document.getElementById('modal-title');
 
 function startCameraScan() {
     const btn = document.getElementById('btn-cam-scan');
-    btn.disabled = true;
+    
+    // Validate inputs
+    if (!getApiKey()) {
+        appendLog(`❌ API key is required`);
+        return;
+    }
+    
+    const scanValue = document.getElementById('camera-cidr').value.trim();
+    if (!scanValue) {
+        appendLog(`❌ Network CIDR is required`);
+        return;
+    }
+    
+    setButtonLoading(btn, true);
     cameraResultsEl.innerHTML = ''; // Clear previous results
+    
     startJob('/api/scan_cameras', {
-        network_cidr: document.getElementById('camera-cidr').value.trim(),
-    }, 'WiFi Camera Scan').finally(() => { btn.disabled = false; });
+        network_cidr: toCIDR(scanValue),
+    }, 'WiFi Camera Scan').finally(() => { setButtonLoading(btn, false); });
 }
 
 function displayFoundCameras(cameras) {
@@ -176,8 +190,33 @@ function displayFoundCameras(cameras) {
 
 function viewStream(ip, port, model) {
     modalTitle.innerText = `Live Stream: ${model} (${ip})`;
-    // Append API key and a timestamp to bust cache
-    modalStreamImg.src = `/api/camera_stream/${ip}/${port}?apiKey=${encodeURIComponent(getApiKey())}&t=${new Date().getTime()}`;
+    
+    // Validate inputs
+    if (!ip || !port) {
+        appendLog(`❌ Invalid camera parameters: IP=${ip}, Port=${port}`);
+        return;
+    }
+    
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        appendLog(`❌ API key is required for camera streaming`);
+        return;
+    }
+    
+    // Construct the stream URL with proper encoding
+    const streamUrl = `/api/camera_stream/${encodeURIComponent(ip)}/${encodeURIComponent(port)}?apiKey=${encodeURIComponent(apiKey)}&t=${new Date().getTime()}`;
+    
+    // Set up error handling for the image
+    modalStreamImg.onerror = function() {
+        appendLog(`❌ Failed to load camera stream from ${ip}:${port}`);
+        modalStreamImg.alt = `Failed to load stream from ${ip}:${port}. Check if camera is accessible and streaming.`;
+    };
+    
+    modalStreamImg.onload = function() {
+        appendLog(`✅ Camera stream loaded from ${ip}:${port}`);
+    };
+    
+    modalStreamImg.src = streamUrl;
     streamModal.style.display = 'block';
 }
 
@@ -198,9 +237,35 @@ window.onclick = function(event) {
 // Regenerating preserved functions here for completeness, as they were elided above.
 // This ensures the final script is 100% complete as requested.
 async function handleApiResponse(response) {
-    const data = await response.json();
-    if (!response.ok) { throw new Error(`${response.status}: ${data.error || 'Unknown error'}`); }
+    let data;
+    try {
+        data = await response.json();
+    } catch (e) {
+        throw new Error(`${response.status}: Invalid JSON response from server`);
+    }
+    
+    if (!response.ok) {
+        const errorMsg = data.error || data.message || 'Unknown error';
+        const errorDetails = data.details ? ` Details: ${JSON.stringify(data.details)}` : '';
+        throw new Error(`Server Error (${response.status}): ${errorMsg}${errorDetails}`);
+    }
     return data;
+}
+
+function setButtonLoading(button, loading = true) {
+    if (!button) return;
+    
+    if (loading) {
+        button.disabled = true;
+        button.dataset.originalText = button.textContent;
+        button.textContent = button.textContent + ' ⏳';
+    } else {
+        button.disabled = false;
+        if (button.dataset.originalText) {
+            button.textContent = button.dataset.originalText;
+            delete button.dataset.originalText;
+        }
+    }
 }
 function appendLog(s, jobId = null) {
   const t = new Date().toLocaleTimeString();
@@ -216,42 +281,158 @@ function appendLog(s, jobId = null) {
   logEl.appendChild(div);
   logEl.scrollTop = logEl.scrollHeight;
 }
+function toCIDR(value) {
+    if (value.includes('/')) return value;
+    // assume single host -> make /32
+    return value + '/32';
+}
+
 async function runArp() {
-    appendLog(`Initiating ARP scan...`);
     const btn = document.getElementById('btn-arp');
-    btn.disabled = true;
+    
+    // Validate API key
+    if (!getApiKey()) {
+        appendLog(`❌ API key is required`);
+        return;
+    }
+    
+    appendLog(`Initiating ARP scan...`);
+    setButtonLoading(btn, true);
+    
     try {
-        const response = await fetch('/api/scan_network', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() }, body: JSON.stringify({ target_cidr: document.getElementById('cidr').value.trim(), interface: document.getElementById('iface').value.trim() }) });
+        const scanValue = document.getElementById('cidr').value.trim();
+        if (!scanValue) {
+            appendLog(`❌ Network CIDR is required`);
+            return;
+        }
+        
+        const response = await fetch('/api/scan_network', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() }, 
+            body: JSON.stringify({ 
+                target_cidr: toCIDR(scanValue), 
+                interface: document.getElementById('iface').value.trim() 
+            }) 
+        });
         const data = await handleApiResponse(response);
         appendLog(`✅ ARP Result: <pre>${JSON.stringify(data, null, 2)}</pre>`);
-    } catch (err) { appendLog(`❌ ARP Error: ${err.message}`); } 
-    finally { btn.disabled = false; }
+    } catch (err) { 
+        appendLog(`❌ ARP Error: ${err.message}`); 
+    } finally { 
+        setButtonLoading(btn, false); 
+    }
 }
 async function testCred() {
+    const btn = document.querySelector('button[onclick="testCred()"]');
     const ip = document.getElementById('cred-ip').value.trim();
     const proto = document.getElementById('cred-proto').value;
+    
+    // Validate inputs
+    if (!getApiKey()) {
+        appendLog(`❌ API key is required`);
+        return;
+    }
+    if (!ip) {
+        appendLog(`❌ Target IP is required`);
+        return;
+    }
+    
     appendLog(`Testing connectivity to ${ip} (${proto})...`);
+    setButtonLoading(btn, true);
+    
     try {
-        const response = await fetch('/api/test_credentials', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() }, body: JSON.stringify({ ip, protocol: proto }) });
+        const response = await fetch('/api/test_credentials', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() }, 
+            body: JSON.stringify({ ip, protocol: proto }) 
+        });
         const data = await handleApiResponse(response);
         appendLog(`✅ Connectivity Test: ${data.message}`);
-    } catch (e) { appendLog(`❌ Connectivity Error: ${e.message}`); }
+    } catch (e) { 
+        appendLog(`❌ Connectivity Error: ${e.message}`); 
+    } finally {
+        setButtonLoading(btn, false);
+    }
 }
 async function startJob(endpoint, body, name) {
+    // Validate API key
+    if (!getApiKey()) {
+        appendLog(`❌ API key is required`);
+        return;
+    }
+    
     appendLog(`Queueing ${name} job...`);
     try {
-        const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() }, body: JSON.stringify(body) });
+        const response = await fetch(endpoint, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() }, 
+            body: JSON.stringify(body) 
+        });
         const data = await handleApiResponse(response);
-        if (data.job_id) { appendLog(`${name} job created: ${data.job_id}. Polling...`); pollJob(data.job_id); }
-    } catch (e) { appendLog(`❌ ${name} Error: ${e.message}`); }
+        if (data.job_id) { 
+            appendLog(`${name} job created: ${data.job_id}. Polling...`); 
+            pollJob(data.job_id); 
+        }
+    } catch (e) { 
+        appendLog(`❌ ${name} Error: ${e.message}`); 
+    }
 }
 function startHydra() {
     const btn = document.getElementById('hydra-btn');
-    btn.disabled = true;
-    startJob('/api/hydra_attack', { ip: document.getElementById('hydra-ip').value.trim(), protocol: document.getElementById('hydra-proto').value, username_wordlist: document.getElementById('hydra-users').value, password_wordlist: document.getElementById('hydra-pass').value }, 'Hydra').finally(() => { btn.disabled = false; });
+    const ip = document.getElementById('hydra-ip').value.trim();
+    const proto = document.getElementById('hydra-proto').value;
+    const users = document.getElementById('hydra-users').value.trim();
+    const pass = document.getElementById('hydra-pass').value.trim();
+    
+    // Validate inputs
+    if (!getApiKey()) {
+        appendLog(`❌ API key is required`);
+        return;
+    }
+    if (!ip) {
+        appendLog(`❌ Target IP is required`);
+        return;
+    }
+    if (!users) {
+        appendLog(`❌ Username wordlist is required`);
+        return;
+    }
+    if (!pass) {
+        appendLog(`❌ Password wordlist is required`);
+        return;
+    }
+    
+    setButtonLoading(btn, true);
+    startJob('/api/hydra_attack', { 
+        ip: ip, 
+        protocol: proto, 
+        username_wordlist: users, 
+        password_wordlist: pass,
+        timeout: 300
+    }, 'Hydra').finally(() => { setButtonLoading(btn, false); });
 }
 function runExploit() {
-    startJob('/api/execute_exploit', { ip: document.getElementById('exp-ip').value.trim(), module: document.getElementById('exp-mod').value.trim() }, 'Metasploit');
+    const btn = document.querySelector('button[onclick="runExploit()"]');
+    const ip = document.getElementById('exp-ip').value.trim();
+    const module = document.getElementById('exp-mod').value.trim();
+    
+    // Validate inputs
+    if (!getApiKey()) {
+        appendLog(`❌ API key is required`);
+        return;
+    }
+    if (!ip) {
+        appendLog(`❌ Target IP is required`);
+        return;
+    }
+    if (!module) {
+        appendLog(`❌ Exploit module is required`);
+        return;
+    }
+    
+    setButtonLoading(btn, true);
+    startJob('/api/execute_exploit', { ip: ip, module: module }, 'Metasploit')
+        .finally(() => { setButtonLoading(btn, false); });
 }
 async function cancelJob(jobId) {
     appendLog(`Requesting cancellation for job ${jobId}...`);

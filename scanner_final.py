@@ -78,35 +78,94 @@ def hydra_attack(ip, protocol, username_wordlist, password_wordlist, timeout=300
 def execute_exploit(ip, module_name, msf_password, timeout=60):
     """Connects to Metasploit RPC and executes a whitelisted module."""
     try:
-        client = MsfRpcClient(msf_password, ssl=False)
+        # Try to connect to Metasploit RPC
+        try:
+            client = MsfRpcClient(msf_password, ssl=False, port=55553)
+        except ConnectionRefusedError:
+            # Try alternative port
+            try:
+                client = MsfRpcClient(msf_password, ssl=False, port=55552)
+            except ConnectionRefusedError:
+                return {
+                    "status": "error", 
+                    "message": "Failed to connect to msfrpcd. Please ensure msfrpcd is running on localhost:55553 or localhost:55552"
+                }
+        
         if not client.authenticated:
-             raise ConnectionRefusedError("Authentication to Metasploit RPC failed. Check password.")
+            return {
+                "status": "error", 
+                "message": "Authentication to Metasploit RPC failed. Check MSF_PASSWORD environment variable."
+            }
 
-        module_type, module_path = module_name.split('/', 1)
-        exploit = client.modules.use(module_type, module_path)
+        # Parse and load the module
+        try:
+            module_type, module_path = module_name.split('/', 1)
+            exploit = client.modules.use(module_type, module_path)
+            if not exploit:
+                return {
+                    "status": "error", 
+                    "message": f"Failed to load module {module_name}. Module may not exist or be whitelisted."
+                }
+        except ValueError:
+            return {
+                "status": "error", 
+                "message": f"Invalid module name format: {module_name}. Expected format: type/path"
+            }
+
+        # Configure and execute the module
         exploit['RHOSTS'] = ip
-
         logging.info(f"Executing module {exploit.fullname} on {ip}...")
-        job_info = exploit.execute()
+        
+        try:
+            job_info = exploit.execute()
+        except Exception as e:
+            return {
+                "status": "error", 
+                "message": f"Failed to execute module: {e}"
+            }
 
         job_id = job_info.get('job_id')
         if job_id is None:
-            return {"error": "Failed to start exploit job.", "details": job_info}
+            return {
+                "status": "error", 
+                "message": "Failed to start exploit job",
+                "details": job_info
+            }
             
         logging.info(f"Exploit started as job ID: {job_id}. Polling for session...")
         
+        # Poll for sessions
+        import time
         for _ in range(timeout):
-            sessions = client.sessions.list
-            for session_id, session_data in sessions.items():
-                if session_data.get('via_exploit') == exploit.fullname and session_data.get('session_host') == ip:
-                    logging.info(f"SUCCESS! Session {session_id} opened.")
-                    return {"status": "success", "session_id": session_id, "details": session_data}
-            subprocess.run(['sleep', '1'], check=False)
+            try:
+                sessions = client.sessions.list
+                for session_id, session_data in sessions.items():
+                    if (session_data.get('via_exploit') == exploit.fullname and 
+                        session_data.get('session_host') == ip):
+                        logging.info(f"SUCCESS! Session {session_id} opened.")
+                        return {
+                            "status": "success", 
+                            "session_id": session_id, 
+                            "details": session_data
+                        }
+                time.sleep(1)
+            except Exception as e:
+                logging.warning(f"Error while polling for sessions: {e}")
+                break
         
-        return {"status": "pending", "message": f"Exploit job started, but no session was created within {timeout} seconds."}
-    except ConnectionRefusedError as e:
-        logging.error(f"Metasploit connection failed: {e}")
-        return {"error": f"Failed to connect to Metasploit. Is msfrpcd running and accessible? Details: {e}"}
+        return {
+            "status": "timeout", 
+            "message": f"Exploit job started, but no session was created within {timeout} seconds."
+        }
+        
+    except ImportError:
+        return {
+            "status": "error", 
+            "message": "pymetasploit3 library not available. Please install it with: pip install pymetasploit3"
+        }
     except Exception as e:
         logging.error(f"Metasploit integration error: {e}")
-        return {"error": f"Failed to connect or run exploit. Details: {e}"}
+        return {
+            "status": "error", 
+            "message": f"Unexpected error: {e}"
+        }
