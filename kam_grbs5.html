@@ -199,6 +199,86 @@
             .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; align-items:start; }
         }
 
+        /* From Uiverse.io by Smit-Prajapati */ 
+        .button {
+          /* in scss with just one variable i can change opacity with rgba(variable, opacity) but in css it's not possible so i have used three seperate variables */
+          /* with hue-rotate color can be changed */
+          --main-color: rgb(46, 213, 115);
+          --main-bg-color: rgba(46, 213, 116, 0.36);
+          --pattern-color: rgba(46, 213, 116, 0.073);
+
+          /* change this rotation value */
+          filter: hue-rotate(0deg);
+
+          cursor: pointer;
+          text-transform: uppercase;
+          letter-spacing: 0.5rem;
+          background: radial-gradient(
+              circle,
+              var(--main-bg-color) 0%,
+              rgba(0, 0, 0, 0) 95%
+            ),
+            linear-gradient(var(--pattern-color) 1px, transparent 1px),
+            linear-gradient(to right, var(--pattern-color) 1px, transparent 1px);
+          background-size:
+            cover,
+            15px 15px,
+            15px 15px;
+          background-position:
+            center center,
+            center center,
+            center center;
+          border-image: radial-gradient(
+              circle,
+              var(--main-color) 0%,
+              rgba(0, 0, 0, 0) 100%
+            )
+            1;
+          border-width: 1px 0 1px 0;
+          color: var(--main-color);
+          padding: 1rem 3rem;
+          font-weight: 700;
+          font-size: 1.5rem;
+          transition: background-size 0.2s ease-in-out;
+          border-style: solid;
+          border-left: none;
+          border-right: none;
+          width: 100%;
+          margin-top: 1rem;
+        }
+
+        .button:hover {
+          background-size:
+            cover,
+            10px 10px,
+            10px 10px;
+        }
+        .button:active {
+          filter: hue-rotate(250deg);
+        }
+
+        /* Color variants for different button types */
+        .button.scan-button {
+          --main-color: rgb(34, 197, 94);
+          --main-bg-color: rgba(34, 197, 94, 0.36);
+          --pattern-color: rgba(34, 197, 94, 0.073);
+          filter: hue-rotate(0deg);
+        }
+
+        .button.attack-button {
+          --main-color: rgb(239, 68, 68);
+          --main-bg-color: rgba(239, 68, 68, 0.36);
+          --pattern-color: rgba(239, 68, 68, 0.073);
+          filter: hue-rotate(0deg);
+        }
+
+        .button.exploit-button {
+          --main-color: rgb(249, 115, 22);
+          --main-bg-color: rgba(249, 115, 22, 0.36);
+          --pattern-color: rgba(249, 115, 22, 0.073);
+          filter: hue-rotate(0deg);
+        }
+
     </style>
 </head>
 <body>
@@ -315,7 +395,7 @@
                         <label class="label">IP RANGE (CIDR)</label>
                         <input id="cidr" class="input" placeholder="192.168.1.0/24" value="192.168.1.0/24" />
                     </div>
-                    <button class="btn" id="btn-arp" onclick="runArp()">INITIATE NETWORK SCAN</button>
+                    <button class="button scan-button" id="btn-arp" onclick="runArp()">INITIATE NETWORK SCAN</button>
                 </section>
 
                 <div class="grid2">
@@ -389,7 +469,7 @@
                                 ></textarea>
                               </div>
 
-                              <button class="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold py-3 px-6 rounded-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-400" onclick="startHydra()" id="hydra-btn">
+                              <button class="button attack-button" onclick="startHydra()" id="hydra-btn">
                                 ⚔️ INITIATE BRUTE FORCE ATTACK
                               </button>
                             </div>
@@ -456,8 +536,8 @@
                             </select>
                           </div>
 
-                          <button class="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-bold py-3 px-6 rounded-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-400" onclick="runExploit()">
-                            💣 DEPLOY EXPLOIT MODULE
+                          <button class="button exploit-button" onclick="runExploit()">
+                            💣 EXECUTE EXPLOIT MODULE
                           </button>
                         </div>
 
