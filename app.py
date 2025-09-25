@@ -32,7 +32,7 @@ class Config:
     SECRET_API_KEY = os.environ.get("NEONHACK_API_KEY", "change-this-insecure-default-key")
     MSF_PASSWORD = os.environ.get("MSF_PASSWORD", "msf_rpc_password")
     DATABASE_PATH = "jobs.db"
-    PRIV_SOCKET_PATH = "/tmp/priv_scanner.sock"
+    PRIV_SOCKET_PATH = "/run/priv_scanner.sock"
     
     ALLOWED_SCAN_SUBNETS = [
         ipaddress.ip_network("192.168.1.0/24"),
@@ -113,7 +113,7 @@ def validate_cidr(cidr_str):
     except ValueError: raise AppError("Invalid CIDR network format")
 
 def validate_interface(if_str):
-    if not re.match(r'^[a-zA-Z0-9]{1,16}$', if_str): raise AppError("Invalid network interface name")
+    if not re.match(r'^[a-zA-Z0-9._:-]{1,16}$', if_str): raise AppError("Invalid network interface name")
     return if_str
 
 def validate_module(mod_str):
@@ -140,35 +140,27 @@ def set_resource_limits():
         logging.warning("Could not set resource limits. 'resource' module may not be available on this OS.")
 
 def run_hydra_in_background(job_id, ip, protocol, user_wl, pass_wl):
-    result_dict = {}
-    proc = None
+    """Run Hydra using the hardened wrapper in scanner_final (temp files), not stdin pipes."""
     try:
-        command = ['hydra', '-L', '-', '-P', '-', f'{protocol}://{ip}']
-        proc = subprocess.Popen(
-            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-            text=True, preexec_fn=set_resource_limits
-        )
-        
         with app.app_context():
             db = sqlite3.connect(app.config['DATABASE_PATH'])
-            db.execute("UPDATE jobs SET status = 'running', pid = ? WHERE id = ?", (proc.pid, job_id))
+            db.execute("UPDATE jobs SET status = 'running', pid = NULL WHERE id = ?", (job_id,))
             db.commit()
 
-        stdout, stderr = proc.communicate(input=f"{user_wl}\n{pass_wl}", timeout=app.config['HYDRA_TIMEOUT_SECONDS'])
-        
-        if stderr: result_dict = {"status": "error", "message": f"Hydra Error: {stderr}"}
-        else: result_dict = {"status": "success", "data": stdout or "No credentials found."}
-            
-    except subprocess.TimeoutExpired:
-        logging.warning(f"Job {job_id} timed out. Terminating PID {proc.pid if proc else 'N/A'}.")
-        if proc: proc.kill()
-        result_dict = {"status": "error", "message": "Process timed out."}
+        result_dict = scanner.hydra_attack(
+            ip=ip,
+            protocol=protocol,
+            username_wordlist=user_wl,
+            password_wordlist=pass_wl,
+            timeout=app.config['HYDRA_TIMEOUT_SECONDS']
+        )
     except Exception as e:
+        logging.exception("Hydra background task failed")
         result_dict = {"status": "error", "message": f"An unexpected error occurred: {e}"}
     finally:
         with app.app_context():
             db = sqlite3.connect(app.config['DATABASE_PATH'])
-            db.execute( "UPDATE jobs SET status = ?, result = ?, updated_at = ? WHERE id = ?", ("done", json.dumps(result_dict), datetime.utcnow().isoformat(), job_id))
+            db.execute("UPDATE jobs SET status = ?, result = ?, updated_at = ? WHERE id = ?", ("done", json.dumps(result_dict), datetime.utcnow().isoformat(), job_id))
             db.commit()
             db.close()
 
@@ -180,18 +172,60 @@ def run_exploit_in_background(job_id, ip, module):
         db.commit()
         db.close()
 
-def run_camera_scan_in_background(job_id, network_cidr):
-    discovered_cameras = camera_scanner.find_cameras(network_cidr)
-    result_dict = {"status": "success", "data": discovered_cameras}
-    with app.app_context():
-        db = sqlite3.connect(app.config['DATABASE_PATH'])
-        db.execute("UPDATE jobs SET status = ?, result = ?, updated_at = ? WHERE id = ?", ("done", json.dumps(result_dict), datetime.utcnow().isoformat(), job_id))
-        db.commit()
-        db.close()
+def run_camera_scan_in_background(job_id, network_cidr, interface):
+    """Use the privileged socket for ARP discovery, then probe cameras from this process."""
+    try:
+        with app.app_context():
+            db = sqlite3.connect(app.config['DATABASE_PATH'])
+            db.execute("UPDATE jobs SET status = 'running', pid = NULL WHERE id = ?", (job_id,))
+            db.commit()
+
+        # Discover devices via privileged service
+        devices = []
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+                s.connect(app.config['PRIV_SOCKET_PATH'])
+                s.sendall(json.dumps({"target_cidr": network_cidr, "interface": interface}).encode('utf-8'))
+                s.shutdown(socket.SHUT_WR)
+                raw = b"".join(iter(lambda: s.recv(4096), b''))
+                devices = json.loads(raw.decode('utf-8'))
+        except Exception as e:
+            logging.exception("Camera scan ARP discovery via privileged service failed")
+            result_dict = {"status": "error", "message": f"Privileged service error: {e}"}
+            with app.app_context():
+                db = sqlite3.connect(app.config['DATABASE_PATH'])
+                db.execute("UPDATE jobs SET status = ?, result = ?, updated_at = ? WHERE id = ?", ("done", json.dumps(result_dict), datetime.utcnow().isoformat(), job_id))
+                db.commit()
+                db.close()
+            return
+
+        # Probe each discovered IP for camera fingerprints
+        ips = [d.get('ip') for d in devices if isinstance(d, dict) and d.get('ip')]
+        discovered = []
+        with ThreadPoolExecutor(max_workers=10) as local_exec:
+            futures = {local_exec.submit(camera_scanner.detect_camera_model, ip): ip for ip in ips}
+            for fut in futures:
+                try:
+                    res = fut.result()
+                    if res:
+                        discovered.append(res)
+                except Exception:
+                    continue
+
+        result_dict = {"status": "success", "data": discovered}
+    except Exception as e:
+        logging.exception("Camera scan background task failed")
+        result_dict = {"status": "error", "message": f"Unexpected error: {e}"}
+    finally:
+        with app.app_context():
+            db = sqlite3.connect(app.config['DATABASE_PATH'])
+            db.execute("UPDATE jobs SET status = ?, result = ?, updated_at = ? WHERE id = ?", ("done", json.dumps(result_dict), datetime.utcnow().isoformat(), job_id))
+            db.commit()
+            db.close()
 
 # --- 7. API Endpoints ---
 @app.route('/')
-def index(): return render_template('kam_grbs5.html')
+def index(): return render_template('kam_grbs.html')
 
 @app.route('/api/scan_network', methods=['POST'])
 @require_api_key
@@ -236,11 +270,11 @@ def api_execute_exploit():
 @app.route('/api/scan_cameras', methods=['POST'])
 @require_api_key
 def api_scan_cameras():
-    data = request.get_json(); network_cidr = validate_cidr(data.get('network_cidr'))
+    data = request.get_json(); network_cidr = validate_cidr(data.get('network_cidr')); interface = validate_interface(data.get('interface'))
     job_id = secrets.token_hex(16); db = get_db()
     db.execute("INSERT INTO jobs (id, owner_key, type, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)", (job_id, g.api_key_identifier, 'camera_scan', 'queued', datetime.utcnow().isoformat(), datetime.utcnow().isoformat()))
     db.commit()
-    executor.submit(run_camera_scan_in_background, job_id, network_cidr)
+    executor.submit(run_camera_scan_in_background, job_id, network_cidr, interface)
     return jsonify({"job_id": job_id}), 202
 
 @app.route('/api/job_status/<job_id>', methods=['GET'])
@@ -268,16 +302,31 @@ def cancel_job(job_id):
 
 def generate_camera_frames(ip, port):
     stream_urls = [f"rtsp://{ip}:{port}/live/ch00_1", f"http://{ip}:{port}/video.cgi"]
-    cap = next((cv2.VideoCapture(url) for url in stream_urls if cv2.VideoCapture(url).isOpened()), None)
-    
-    if not cap: logging.error(f"Could not open any known video stream for {ip}:{port}"); return
+    cap = None
+    for url in stream_urls:
+        try:
+            trial = cv2.VideoCapture(url)
+            if trial.isOpened():
+                cap = trial
+                break
+            trial.release()
+        except Exception:
+            try:
+                trial.release()
+            except Exception:
+                pass
+    if not cap:
+        logging.error(f"Could not open any known video stream for {ip}:{port}")
+        return
     logging.info(f"Successfully connected to camera stream for {ip}:{port}")
 
     while True:
         success, frame = cap.read()
-        if not success: break
+        if not success:
+            break
         ret, buffer = cv2.imencode('.jpg', frame)
-        if not ret: continue
+        if not ret:
+            continue
         yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
     cap.release()
 
@@ -291,5 +340,4 @@ if __name__ == '__main__':
     if not os.path.exists(app.config['DATABASE_PATH']): init_db()
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] (WebServer) %(message)s')
     print("--- NEONHACK // Secure Backend // HARDENED v5.2 ---")
-    print(f"--- API Key: {app.config['SECRET_API_KEY']} ---")
     app.run(host='0.0.0.0', port=5000, debug=False)

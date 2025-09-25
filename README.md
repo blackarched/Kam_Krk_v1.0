@@ -69,16 +69,7 @@ Bash
 git clone <repository_url>
 cd <repository_folder>
 Step 3: Install Python Dependencies
-Create a requirements.txt file with the content below, then install the dependencies.
-
-# requirements.txt
-Flask
-Flask-Limiter
-scapy
-requests
-opencv-python
-pymetasploit3
-Now, run the installation command:
+Install the bundled, pinned dependencies.
 
 Bash
 
@@ -89,13 +80,13 @@ The tool uses environment variables for security. Set them in your terminal.
 Bash
 
 # Generate a secure, random key for the API
-export Kam_Krk_API_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+export NEONHACK_API_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
 
 # Set a password for the Metasploit RPC service (msfrpcd)
 export MSF_PASSWORD="your_strong_msf_password"
 
 # Echo the API key so you can copy it for later use
-echo "Your API Key is: $Kam_Krk_API_KEY"
+echo "Your API Key is: $NEONHACK_API_KEY"
 Remember to save the API key! You'll need it to use the tool.
 
 Step 5: Run the Metasploit RPC Service
@@ -111,7 +102,7 @@ The ARP and camera scans require root privileges. Open another new terminal and 
 
 Bash
 
-sudo python3 privileged_scanner_service.py --socket /tmp/priv_scanner.sock
+sudo python3 privileged_scanner_service.py --socket /run/priv_scanner.sock
 This script will listen for scan requests. Leave this terminal running.
 
 Step 7: Run the Main Application

@@ -11,6 +11,7 @@ import os
 import socket
 import json
 from pymetasploit3.msfrpc import MsfRpcClient
+import time
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] - %(message)s')
 
@@ -101,7 +102,7 @@ def execute_exploit(ip, module_name, msf_password, timeout=60):
                 if session_data.get('via_exploit') == exploit.fullname and session_data.get('session_host') == ip:
                     logging.info(f"SUCCESS! Session {session_id} opened.")
                     return {"status": "success", "session_id": session_id, "details": session_data}
-            subprocess.run(['sleep', '1'], check=False)
+            time.sleep(1)
         
         return {"status": "pending", "message": f"Exploit job started, but no session was created within {timeout} seconds."}
     except ConnectionRefusedError as e:

@@ -27,6 +27,7 @@ import sys
 import ipaddress
 import logging
 from typing import List, Dict
+import stat
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
@@ -142,31 +143,45 @@ def handle_client(conn: socket.socket, addr, allowed_uids):
 
 
 def run_socket_server(socket_path: str, allowed_uids):
-    # If systemd already created the socket, do not create; connect to the existing FD.
-    # But for simplicity we'll create & bind only if socket doesn't exist.
-    if os.path.exists(socket_path):
-        # Ensure that if socket exists but not a socket file, we fail
+    """Run UNIX socket server. Support systemd socket activation if present."""
+    serv = None
+    # Try systemd socket activation first
+    listen_fds = int(os.environ.get('LISTEN_FDS', '0'))
+    listen_pid = int(os.environ.get('LISTEN_PID', '0'))
+    if listen_fds >= 1 and listen_pid == os.getpid():
         try:
-            st = os.stat(socket_path)
-            if not stat.S_ISSOCK(st.st_mode):
-                logging.error("%s exists but is not a socket", socket_path)
-                sys.exit(1)
+            serv = socket.fromfd(3, socket.AF_UNIX, socket.SOCK_STREAM)
+            logging.info("Using inherited systemd socket (fd=3)")
         except Exception:
-            pass
+            logging.exception("Failed to use inherited systemd socket; falling back to bind")
+            serv = None
 
-    # Create UNIX domain socket and listen
-    serv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    # Ensure the socket file (if created) has restrictive permissions; systemd typically handles this.
-    try:
-        serv.bind(socket_path)
-    except OSError as e:
-        logging.error("Failed to bind to socket %s: %s", socket_path, e)
-        sys.exit(1)
+    if serv is None:
+        # If a stale socket file exists, remove it before binding
+        if os.path.exists(socket_path):
+            try:
+                st = os.stat(socket_path)
+                if stat.S_ISSOCK(st.st_mode):
+                    os.remove(socket_path)
+                else:
+                    logging.error("%s exists but is not a socket", socket_path)
+                    sys.exit(1)
+            except Exception as e:
+                logging.error("Failed handling existing socket %s: %s", socket_path, e)
+                sys.exit(1)
 
-    # Set tight permissions on the socket file
-    os.chmod(socket_path, 0o660)
-    serv.listen(5)
-    logging.info("Privileged scanner service listening on %s", socket_path)
+        # Create UNIX domain socket and listen
+        serv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            serv.bind(socket_path)
+        except OSError as e:
+            logging.error("Failed to bind to socket %s: %s", socket_path, e)
+            sys.exit(1)
+
+        # Set tight permissions on the socket file
+        os.chmod(socket_path, 0o660)
+        serv.listen(5)
+        logging.info("Privileged scanner service listening on %s", socket_path)
 
     try:
         while True:
