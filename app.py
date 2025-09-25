@@ -139,38 +139,80 @@ def set_resource_limits():
     except (ImportError, ValueError, AttributeError):
         logging.warning("Could not set resource limits. 'resource' module may not be available on this OS.")
 
-def run_hydra_in_background(job_id, ip, protocol, user_wl, pass_wl):
+def run_hydra_in_background(job_id, ip, protocol, user_wl, pass_wl, timeout=None):
     result_dict = {}
     proc = None
+    db_conn = None
+    
+    # Use timeout parameter or default
+    if timeout is None:
+        timeout = app.config['HYDRA_TIMEOUT_SECONDS']
+        
     try:
-        command = ['hydra', '-L', '-', '-P', '-', f'{protocol}://{ip}']
+        # Use full path to hydra binary to avoid PATH issues
+        hydra_cmd = '/usr/bin/hydra'
+        if not os.path.exists(hydra_cmd):
+            # Try common locations
+            for path in ['/usr/local/bin/hydra', '/opt/hydra/hydra', 'hydra']:
+                if os.path.exists(path) or path == 'hydra':
+                    hydra_cmd = path
+                    break
+        
+        command = [hydra_cmd, '-L', '-', '-P', '-', f'{protocol}://{ip}']
         proc = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-            text=True, preexec_fn=set_resource_limits
+            text=True, preexec_fn=set_resource_limits,
+            env=dict(os.environ, PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin')
         )
         
-        with app.app_context():
-            db = sqlite3.connect(app.config['DATABASE_PATH'])
-            db.execute("UPDATE jobs SET status = 'running', pid = ? WHERE id = ?", (proc.pid, job_id))
-            db.commit()
+        # Update job status and PID with proper error handling
+        try:
+            with app.app_context():
+                db_conn = sqlite3.connect(app.config['DATABASE_PATH'])
+                db_conn.execute("UPDATE jobs SET status = ?, pid = ? WHERE id = ?", ('running', proc.pid, job_id))
+                db_conn.commit()
+                db_conn.close()
+                db_conn = None
+        except Exception as db_error:
+            logging.error(f"Failed to update job {job_id} status: {db_error}")
 
-        stdout, stderr = proc.communicate(input=f"{user_wl}\n{pass_wl}", timeout=app.config['HYDRA_TIMEOUT_SECONDS'])
+        stdout, stderr = proc.communicate(input=f"{user_wl}\n{pass_wl}", timeout=timeout)
         
-        if stderr: result_dict = {"status": "error", "message": f"Hydra Error: {stderr}"}
-        else: result_dict = {"status": "success", "data": stdout or "No credentials found."}
+        if stderr: 
+            result_dict = {"status": "error", "message": f"Hydra Error: {stderr}"}
+        else: 
+            result_dict = {"status": "success", "data": stdout or "No credentials found."}
             
     except subprocess.TimeoutExpired:
         logging.warning(f"Job {job_id} timed out. Terminating PID {proc.pid if proc else 'N/A'}.")
-        if proc: proc.kill()
+        if proc: 
+            proc.kill()
+            proc.wait()  # Wait for process to actually terminate
         result_dict = {"status": "error", "message": "Process timed out."}
+    except FileNotFoundError as e:
+        result_dict = {"status": "error", "message": f"Hydra binary not found. Please ensure hydra is installed. Error: {e}"}
+        logging.error(f"Hydra binary not found for job {job_id}: {e}")
     except Exception as e:
         result_dict = {"status": "error", "message": f"An unexpected error occurred: {e}"}
+        logging.error(f"Unexpected error in job {job_id}: {e}")
     finally:
-        with app.app_context():
-            db = sqlite3.connect(app.config['DATABASE_PATH'])
-            db.execute( "UPDATE jobs SET status = ?, result = ?, updated_at = ? WHERE id = ?", ("done", json.dumps(result_dict), datetime.utcnow().isoformat(), job_id))
-            db.commit()
-            db.close()
+        # Ensure database connection is properly closed
+        if db_conn:
+            try:
+                db_conn.close()
+            except:
+                pass
+                
+        # Final job status update
+        try:
+            with app.app_context():
+                db_conn = sqlite3.connect(app.config['DATABASE_PATH'])
+                db_conn.execute("UPDATE jobs SET status = ?, result = ?, updated_at = ? WHERE id = ?", 
+                               ("done", json.dumps(result_dict), datetime.utcnow().isoformat(), job_id))
+                db_conn.commit()
+                db_conn.close()
+        except Exception as db_error:
+            logging.error(f"Failed to update final job {job_id} status: {db_error}")
 
 def run_exploit_in_background(job_id, ip, module):
     result = scanner.execute_exploit(ip, module, app.config['MSF_PASSWORD'], timeout=app.config['MSF_SESSION_TIMEOUT_SECONDS'])
@@ -214,13 +256,28 @@ def api_test_credentials():
 @app.route('/api/hydra_attack', methods=['POST'])
 @require_api_key
 def api_hydra_attack():
-    data = request.get_json(); ip = validate_scope(validate_ip(data.get('ip'))); protocol = data.get('protocol')
-    if protocol not in ['ssh', 'ftp', 'http-get']: raise AppError("Invalid protocol")
-    user_wl, pass_wl = data.get('username_wordlist', ''), data.get('password_wordlist', '')
-    job_id = secrets.token_hex(16); db = get_db()
-    db.execute("INSERT INTO jobs (id, owner_key, type, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)", (job_id, g.api_key_identifier, 'hydra', 'queued', datetime.utcnow().isoformat(), datetime.utcnow().isoformat()))
+    data = request.get_json()
+    ip = validate_scope(validate_ip(data.get('ip')))
+    protocol = data.get('protocol')
+    if protocol not in ['ssh', 'ftp', 'http-get']: 
+        raise AppError("Invalid protocol")
+    
+    user_wl = data.get('username_wordlist', '')
+    pass_wl = data.get('password_wordlist', '')
+    timeout = data.get('timeout', app.config['HYDRA_TIMEOUT_SECONDS'])
+    
+    # Validate that we have wordlists
+    if not user_wl.strip():
+        raise AppError("Username wordlist is required")
+    if not pass_wl.strip():
+        raise AppError("Password wordlist is required")
+    
+    job_id = secrets.token_hex(16)
+    db = get_db()
+    db.execute("INSERT INTO jobs (id, owner_key, type, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)", 
+               (job_id, g.api_key_identifier, 'hydra', 'queued', datetime.utcnow().isoformat(), datetime.utcnow().isoformat()))
     db.commit()
-    executor.submit(run_hydra_in_background, job_id, ip, protocol, user_wl, pass_wl)
+    executor.submit(run_hydra_in_background, job_id, ip, protocol, user_wl, pass_wl, timeout)
     return jsonify({"job_id": job_id}), 202
 
 @app.route('/api/execute_exploit', methods=['POST'])
@@ -251,35 +308,183 @@ def get_job_status(job_id):
     if job['owner_key'] != g.api_key_identifier: raise AppError("Forbidden", 403)
     return jsonify(dict(job))
 
+def kill_process_tree(pid):
+    """Kill a process and all its children."""
+    import psutil
+    try:
+        parent = psutil.Process(pid)
+        children = parent.children(recursive=True)
+        
+        # First, try to terminate gracefully
+        for child in children:
+            try:
+                child.terminate()
+            except psutil.NoSuchProcess:
+                pass
+        
+        try:
+            parent.terminate()
+        except psutil.NoSuchProcess:
+            return True  # Process already gone
+        
+        # Wait up to 5 seconds for graceful termination
+        gone, alive = psutil.wait_procs(children + [parent], timeout=5)
+        
+        # Force kill any remaining processes
+        for p in alive:
+            try:
+                p.kill()
+                logging.warning(f"Force killed process {p.pid}")
+            except psutil.NoSuchProcess:
+                pass
+        
+        return True
+        
+    except psutil.NoSuchProcess:
+        return True  # Process already gone
+    except Exception as e:
+        logging.error(f"Error killing process tree for PID {pid}: {e}")
+        return False
+
+def simple_kill_process(pid):
+    """Fallback process killing without psutil."""
+    try:
+        # Try SIGTERM first
+        os.kill(pid, signal.SIGTERM)
+        
+        # Wait a bit for graceful termination
+        import time
+        for _ in range(10):
+            try:
+                # Check if process still exists
+                os.kill(pid, 0)  # This doesn't kill, just checks existence
+                time.sleep(0.5)
+            except ProcessLookupError:
+                return True  # Process terminated
+        
+        # If still running, force kill
+        try:
+            os.kill(pid, signal.SIGKILL)
+            logging.warning(f"Force killed process {pid} with SIGKILL")
+            return True
+        except ProcessLookupError:
+            return True  # Process already gone
+            
+    except ProcessLookupError:
+        return True  # Process already gone
+    except Exception as e:
+        logging.error(f"Error killing process {pid}: {e}")
+        return False
+
 @app.route('/api/job/<job_id>/cancel', methods=['POST'])
 @require_api_key
 def cancel_job(job_id):
-    db = get_db(); job = db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-    if not job: raise AppError("Job not found", 404)
-    if job['owner_key'] != g.api_key_identifier: raise AppError("Forbidden", 403)
-    if job['status'] not in ['queued', 'running']: raise AppError(f"Job in state '{job['status']}' cannot be cancelled", 409)
+    db = get_db()
+    job = db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if not job: 
+        raise AppError("Job not found", 404)
+    if job['owner_key'] != g.api_key_identifier: 
+        raise AppError("Forbidden", 403)
+    if job['status'] not in ['queued', 'running']: 
+        raise AppError(f"Job in state '{job['status']}' cannot be cancelled", 409)
+    
+    cancellation_success = True
     
     if job['status'] == 'running' and job['pid']:
-        try: os.kill(job['pid'], signal.SIGTERM)
-        except ProcessLookupError: logging.warning(f"Process PID {job['pid']} for job {job_id} already gone.")
+        logging.info(f"Attempting to cancel job {job_id} with PID {job['pid']}")
+        
+        # Try advanced process killing first
+        try:
+            cancellation_success = kill_process_tree(job['pid'])
+        except ImportError:
+            # Fallback if psutil not available
+            logging.warning("psutil not available, using simple process killing")
+            cancellation_success = simple_kill_process(job['pid'])
+        
+        if not cancellation_success:
+            logging.error(f"Failed to kill process {job['pid']} for job {job_id}")
     
-    db.execute("UPDATE jobs SET status = 'cancelled' WHERE id = ?", (job_id,)); db.commit()
-    return jsonify({"status": "cancellation_requested", "job_id": job_id})
+    # Update job status regardless of kill success
+    db.execute("UPDATE jobs SET status = ?, updated_at = ? WHERE id = ?", 
+               ('cancelled', datetime.utcnow().isoformat(), job_id))
+    db.commit()
+    
+    response_data = {
+        "status": "cancellation_requested", 
+        "job_id": job_id,
+        "process_killed": cancellation_success if job.get('pid') else None
+    }
+    
+    return jsonify(response_data)
 
 def generate_camera_frames(ip, port):
-    stream_urls = [f"rtsp://{ip}:{port}/live/ch00_1", f"http://{ip}:{port}/video.cgi"]
-    cap = next((cv2.VideoCapture(url) for url in stream_urls if cv2.VideoCapture(url).isOpened()), None)
+    """Generate camera frames for streaming with proper error handling."""
+    # Common camera stream URLs to try
+    stream_urls = [
+        f"rtsp://{ip}:{port}/live/ch00_1",
+        f"http://{ip}:{port}/video.cgi",
+        f"rtsp://{ip}:{port}/stream",
+        f"http://{ip}:{port}/mjpeg",
+        f"rtsp://{ip}:{port}/",
+        f"http://{ip}:{port}/"
+    ]
     
-    if not cap: logging.error(f"Could not open any known video stream for {ip}:{port}"); return
-    logging.info(f"Successfully connected to camera stream for {ip}:{port}")
-
-    while True:
-        success, frame = cap.read()
-        if not success: break
-        ret, buffer = cv2.imencode('.jpg', frame)
-        if not ret: continue
-        yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-    cap.release()
+    cap = None
+    successful_url = None
+    
+    # Try each URL until one works
+    for url in stream_urls:
+        try:
+            test_cap = cv2.VideoCapture(url)
+            if test_cap.isOpened():
+                # Test if we can actually read a frame
+                ret, frame = test_cap.read()
+                if ret and frame is not None:
+                    cap = test_cap
+                    successful_url = url
+                    break
+                else:
+                    test_cap.release()
+            else:
+                test_cap.release()
+        except Exception as e:
+            logging.warning(f"Failed to test camera URL {url}: {e}")
+            if test_cap:
+                test_cap.release()
+    
+    if not cap or successful_url is None:
+        logging.error(f"Could not open any video stream for {ip}:{port}")
+        # Return a single error frame
+        error_frame = b'--frame\r\nContent-Type: text/plain\r\n\r\nNo camera stream available\r\n'
+        yield error_frame
+        return
+    
+    logging.info(f"Successfully connected to camera stream: {successful_url}")
+    
+    frame_count = 0
+    max_frames = 3600  # Limit streaming to prevent resource exhaustion
+    
+    try:
+        while frame_count < max_frames:
+            success, frame = cap.read()
+            if not success:
+                logging.warning(f"Failed to read frame {frame_count} from {successful_url}")
+                break
+                
+            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            if not ret:
+                logging.warning(f"Failed to encode frame {frame_count}")
+                continue
+                
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+            frame_count += 1
+            
+    except Exception as e:
+        logging.error(f"Error during camera streaming: {e}")
+    finally:
+        if cap:
+            cap.release()
+            logging.info(f"Released camera stream for {ip}:{port}")
 
 @app.route('/api/camera_stream/<ip>/<int:port>')
 @require_api_key
