@@ -1,165 +1,320 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>NEONHACK // v5.0 — Control Panel</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEONHACK // v5.0 — Control Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- Base & Original Styles --- */
+        body {
+            font-family: 'Fira-Code', monospace;
+            background-color: #000;
+            color: #c9d1d9;
+        }
+        .main-content-wrapper {
+            position: relative;
+            z-index: 10;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0d1117; }
+        ::-webkit-scrollbar-thumb { background: #8A2BE2; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff00de; }
 
-<style>
-  :root{
-    --bg:#08060a;
-    --panel:#0f0f12;
-    --neon-cyan:#00f1ff;
-    --neon-pink:#ff39b0;
-    --accent:#00ffad;
-    --muted:#9aa0a6;
-    --glass: rgba(255,255,255,0.03);
-    --card-radius:18px;
-  }
-  html,body{height:100%;margin:0;background:
-    radial-gradient(ellipse at 20% 10%, rgba(0,0,0,0.75), transparent 10%),
-    linear-gradient(180deg, #0a0810 0%, #060305 40%, #050203 100%);
-    font-family: "Courier New", Courier, monospace; color:#e9eef6;}
-  header.appheader{
-    text-align:center;padding:28px 12px 16px 12px;
-    background: linear-gradient(90deg,var(--neon-pink), #7a2bff);
-    color:white; box-shadow: 0 12px 40px rgba(0,0,0,0.6);
-    border-bottom: 4px solid rgba(255,255,255,0.03);
-  }
-  header.appheader h1{
-    margin:0;font-size:36px;letter-spacing:6px;
-    text-shadow: 0 6px 20px rgba(0,0,0,0.6), 0 0 18px rgba(255,0,160,0.25);
-  }
-  .subtitle{
-    margin-top:6px;font-size:12px; color:rgba(255,255,255,0.85);
-    letter-spacing:4px;
-  }
+        .result-table td { padding: 10px 15px; border-bottom: 1px solid #30363d; }
+        .result-table td:first-child { font-weight: bold; color: #58a6ff; width: 30%; }
+        .tab-button { transition: all 0.3s ease-in-out; border-bottom: 2px solid transparent; }
+        .tab-button.active { border-bottom-color: #c000ff; color: #c000ff; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
 
-  main.container{
-    width:100%; max-width:980px; margin:18px auto 120px auto; padding:0 14px;
-    box-sizing:border-box;
-  }
-  .card{
-    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.25));
-    border-radius: var(--card-radius);
-    padding:18px;
-    margin: 14px 0;
-    border: 1px solid rgba(120,80,200,0.12);
-    box-shadow: 0 14px 40px rgba(0,0,0,0.6), 0 0 30px rgba(0,255,210,0.02) inset;
-  }
-  .card-title{
-    display:flex;align-items:center;gap:10px;margin-bottom:14px;
-    font-size:20px;color:var(--neon-pink); letter-spacing:4px;
-    text-shadow: 0 0 10px rgba(255,50,140,0.08);
-  }
-  .card .label{
-    display:block;color:var(--accent);font-size:12px;letter-spacing:2px;margin-top:6px;
-  }
-  .input, textarea, select {
-    width:100%; box-sizing:border-box;
-    background: rgba(8,6,10,0.6); border-radius:10px;
-    border: 2px solid rgba(120,60,200,0.2); color:#ccf7ff;
-    padding:12px 14px; font-family: "Courier New", monospace; font-size:16px;
-    outline:none; transition: box-shadow .18s, border-color .18s;
-  }
-  .input:focus, textarea:focus, select:focus {
-    box-shadow: 0 0 18px rgba(0,240,255,0.08);
-    border-color: rgba(0,255,210,0.45);
-  }
-  textarea {min-height:90px; resize:vertical;}
-  .btn{
-    display:inline-block; padding:14px 18px; width:100%;
-    border-radius:12px; border:none; cursor:pointer;
-    background: linear-gradient(90deg,var(--neon-pink), #7a2bff);
-    color: white; font-weight:700; letter-spacing:3px; margin-top:14px;
-    font-size:14px; box-shadow: 0 6px 30px rgba(255,0,150,0.12);
-  }
-  .btn:active{ transform: translateY(1px); }
-  .btn[disabled]{ opacity:0.6; pointer-events:none; }
-  #log{
-    background: linear-gradient(180deg, rgba(0,0,0,0.7), rgba(2,2,4,0.86));
-    border-radius:12px; padding:12px; height:220px; overflow:auto;
-    border:1px solid rgba(0,255,220,0.04); box-shadow: 0 12px 40px rgba(0,0,0,0.6) inset;
-    font-family: monospace; font-size:13px; color:#a7f6ff;
-  }
-  @media(min-width:860px){
-    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; align-items:start; }
-  }
-  .muted{ color:var(--muted); font-size:13px; margin-top:6px;}
-  .row{ margin-bottom:6px;}
-  .card small.hint{ color:#9feadf; opacity:0.9; display:block; margin-top:6px; font-size:12px;}
-</style>
+        /* --- Integrated Matrix Rain CSS (for background) --- */
+        .matrix-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; display: flex; overflow: hidden; z-index: -1; }
+        .matrix-pattern { position: relative; width: 1000px; height: 100%; flex-shrink: 0; }
+        .matrix-column { position: absolute; top: -100%; width: 20px; height: 100%; font-size: 16px; line-height: 18px; font-weight: bold; animation: fall linear infinite; white-space: nowrap; }
+        .matrix-column::before { content: "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; position: absolute; top: 0; left: 0; background: linear-gradient( to bottom, #ffffff 0%, #ffffff 5%, #00ff41 10%, #00ff41 20%, #00dd33 30%, #00bb22 40%, #009911 50%, #007700 60%, #005500 70%, #003300 80%, rgba(0, 255, 65, 0.5) 90%, transparent 100% ); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; writing-mode: vertical-lr; letter-spacing: 1px; }
+        .matrix-column:nth-child(1){left:0px;animation-delay:-2.5s;animation-duration:3s}.matrix-column:nth-child(2){left:25px;animation-delay:-3.2s;animation-duration:4s}.matrix-column:nth-child(3){left:50px;animation-delay:-1.8s;animation-duration:2.5s}.matrix-column:nth-child(4){left:75px;animation-delay:-2.9s;animation-duration:3.5s}.matrix-column:nth-child(5){left:100px;animation-delay:-1.5s;animation-duration:3s}.matrix-column:nth-child(6){left:125px;animation-delay:-3.8s;animation-duration:4.5s}.matrix-column:nth-child(7){left:150px;animation-delay:-2.1s;animation-duration:2.8s}.matrix-column:nth-child(8){left:175px;animation-delay:-2.7s;animation-duration:3.2s}.matrix-column:nth-child(9){left:200px;animation-delay:-3.4s;animation-duration:3.8s}.matrix-column:nth-child(10){left:225px;animation-delay:-1.9s;animation-duration:2.7s}.matrix-column:nth-child(11){left:250px;animation-delay:-3.6s;animation-duration:4.2s}.matrix-column:nth-child(12){left:275px;animation-delay:-2.3s;animation-duration:3.1s}.matrix-column:nth-child(13){left:300px;animation-delay:-3.1s;animation-duration:3.6s}.matrix-column:nth-child(14){left:325px;animation-delay:-2.6s;animation-duration:2.9s}.matrix-column:nth-child(15){left:350px;animation-delay:-3.7s;animation-duration:4.1s}.matrix-column:nth-child(16){left:375px;animation-delay:-2.8s;animation-duration:3.3s}.matrix-column:nth-child(17){left:400px;animation-delay:-3.3s;animation-duration:3.7s}.matrix-column:nth-child(18){left:425px;animation-delay:-2.2s;animation-duration:2.6s}.matrix-column:nth-child(19){left:450px;animation-delay:-3.9s;animation-duration:4.3s}.matrix-column:nth-child(20){left:475px;animation-delay:-2.4s;animation-duration:3.4s}.matrix-column:nth-child(21){left:500px;animation-delay:-1.7s;animation-duration:2.4s}.matrix-column:nth-child(22){left:525px;animation-delay:-3.5s;animation-duration:3.9s}.matrix-column:nth-child(23){left:550px;animation-delay:-2s;animation-duration:3s}.matrix-column:nth-child(24){left:575px;animation-delay:-4s;animation-duration:4.4s}.matrix-column:nth-child(25){left:600px;animation-delay:-1.6s;animation-duration:2.3s}.matrix-column:nth-child(26){left:625px;animation-delay:-3s;animation-duration:3.5s}.matrix-column:nth-child(27){left:650px;animation-delay:-3.8s;animation-duration:4s}.matrix-column:nth-child(28){left:675px;animation-delay:-2.5s;animation-duration:2.8s}.matrix-column:nth-child(29){left:700px;animation-delay:-3.2s;animation-duration:3.6s}.matrix-column:nth-child(30){left:725px;animation-delay:-2.7s;animation-duration:3.2s}.matrix-column:nth-child(31){left:750px;animation-delay:-1.8s;animation-duration:2.7s}.matrix-column:nth-child(32){left:775px;animation-delay:-3.6s;animation-duration:4.1s}.matrix-column:nth-child(33){left:800px;animation-delay:-2.1s;animation-duration:3.1s}.matrix-column:nth-child(34){left:825px;animation-delay:-3.4s;animation-duration:3.7s}.matrix-column:nth-child(35){left:850px;animation-delay:-2.8s;animation-duration:2.9s}.matrix-column:nth-child(36){left:875px;animation-delay:-3.7s;animation-duration:4.2s}.matrix-column:nth-child(37){left:900px;animation-delay:-2.3s;animation-duration:3.3s}.matrix-column:nth-child(38){left:925px;animation-delay:-1.9s;animation-duration:2.5s}.matrix-column:nth-child(39){left:950px;animation-delay:-3.5s;animation-duration:3.8s}.matrix-column:nth-child(40){left:975px;animation-delay:-2.6s;animation-duration:3.4s}
+        .matrix-column:nth-child(odd)::before{content:"アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン123456789"}.matrix-column:nth-child(even)::before{content:"ガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヴァィゥェォャュョッABCDEFGHIJKLMNOPQRSTUVWXYZ"}.matrix-column:nth-child(3n)::before{content:"アカサタナハマヤラワイキシチニヒミリウクスツヌフムユルエケセテネヘメレオコソトノホモヨロヲン0987654321"}.matrix-column:nth-child(4n)::before{content:"ンヲロヨモホノトソコオレメヘネテセケエルユムフヌツスクウリミヒニチシキイワラヤマハナタサカア"}.matrix-column:nth-child(5n)::before{content:"ガザダバパギジヂビピグズヅブプゲゼデベペゴゾドボポヴァィゥェォャュョッ!@#$%^&*()_+-=[]{}|;:,.<>?"}
+        @keyframes fall{0%{transform:translateY(-10%);opacity:1}100%{transform:translateY(200%);opacity:0}}
+        @media (max-width:768px){.matrix-column{font-size:14px;line-height:16px;width:18px}} @media (max-width:480px){.matrix-column{font-size:12px;line-height:14px;width:15px}}
+
+        /* --- Integrated Neon Globe CSS (for header) --- */
+        #globe-visual-container { display: flex; justify-content: center; align-items: center; margin-bottom: -4rem; transform: scale(0.6); }
+        .loader-container{position:relative;width:400px;height:400px;display:flex;justify-content:center;align-items:center;perspective:800px;transform-style:preserve-3d;z-index:10}.hologram-platform{position:absolute;width:300px;height:60px;bottom:-80px;border-radius:50%;background:radial-gradient(ellipse,rgba(0,221,255,.3) 0%,rgba(0,0,0,0) 70%);box-shadow:0 0 30px rgba(0,221,255,.4);transform:rotateX(60deg);filter:blur(8px);animation:platform-glow 4s infinite alternate}.platform-rings{position:absolute;width:300px;height:60px;bottom:-80px;transform:rotateX(60deg)}.platform-ring{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;border:2px solid transparent;opacity:.4;animation:platform-ring-pulse 4s infinite alternate}.platform-ring:nth-child(1){border-color:rgba(0,221,255,.4);animation-delay:-1s}.platform-ring:nth-child(2){width:85%;height:85%;top:7.5%;left:7.5%;border-color:rgba(255,0,255,.4);animation-delay:-2s}.platform-ring:nth-child(3){width:70%;height:70%;top:15%;left:15%;border-color:rgba(0,221,255,.4);animation-delay:-3s}@keyframes platform-ring-pulse{0%{transform:scale(1);opacity:.2}100%{transform:scale(1.05);opacity:.6}}@keyframes platform-glow{0%{box-shadow:0 0 30px rgba(0,221,255,.4);background:radial-gradient(ellipse,rgba(0,221,255,.3) 0%,rgba(0,0,0,0) 70%)}100%{box-shadow:0 0 50px rgba(255,0,255,.6);background:radial-gradient(ellipse,rgba(255,0,255,.3) 0%,rgba(0,0,0,0) 70%)}}.holo-container{position:relative;width:200px;height:200px;transform-style:preserve-3d;animation:float-container 6s infinite ease-in-out}@keyframes float-container{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}.holo-sphere{position:relative;width:180px;height:180px;left:15px;top:15px;transform-style:preserve-3d;animation:rotate 15s infinite linear}.holo-ring{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;border:2px solid transparent;box-shadow:0 0 20px rgba(255,0,222,.5),0 0 20px rgba(0,221,255,.5);filter:blur(1px);animation:pulse 3s infinite ease-in-out alternate;transform-style:preserve-3d}.holo-ring:nth-child(1){border-top-color:#ff00de;border-bottom-color:#00ddff;animation-delay:-.5s}.holo-ring:nth-child(2){border-top-color:#00ddff;border-bottom-color:#ff00de;animation-delay:-1s;transform:rotateX(60deg)}.holo-ring:nth-child(3){border-top-color:#ff00de;border-bottom-color:#00ddff;animation-delay:-1.5s;transform:rotateY(60deg)}.holo-ring:nth-child(4){width:90%;height:90%;top:5%;left:5%;border-left-color:#00ff77;border-right-color:#ff5500;animation-delay:-2s;transform:rotateZ(45deg)}.holo-ring:nth-child(5){width:110%;height:110%;top:-5%;left:-5%;border-left-color:#ff00b3;border-right-color:#3300ff;animation-delay:-2.5s;transform:rotateX(30deg) rotateY(30deg)}.holo-particles{position:absolute;width:100%;height:100%;transform-style:preserve-3d}.holo-particle{position:absolute;background:radial-gradient(circle,rgba(255,255,255,.9) 0%,rgba(255,255,255,0) 70%);border-radius:50%;filter:blur(1px);opacity:0;transform-style:preserve-3d;animation:particle-float 4s infinite ease-in-out}.holo-particle:nth-child(1){width:8px;height:8px;top:20%;left:30%;animation-delay:.1s}.holo-particle:nth-child(2){width:6px;height:6px;top:70%;left:60%;animation-delay:.7s}.holo-particle:nth-child(3){width:10px;height:10px;top:40%;left:80%;animation-delay:1.3s}.holo-particle:nth-child(4){width:5px;height:5px;top:80%;left:25%;animation-delay:1.9s}.holo-particle:nth-child(5){width:7px;height:7px;top:30%;left:50%;animation-delay:2.5s}.holo-particle:nth-child(6){width:9px;height:9px;top:60%;left:40%;animation-delay:3.1s}.holo-particle:nth-child(7){width:4px;height:4px;top:50%;left:75%;animation-delay:3.7s}.holo-particle:nth-child(8){width:8px;height:8px;top:25%;left:85%;animation-delay:4.3s}@keyframes particle-float{0%,100%{transform:translateZ(0) translateX(0) translateY(0) scale(.8);opacity:0}25%{opacity:1;transform:translateZ(30px) translateX(10px) translateY(-10px) scale(1)}50%{transform:translateZ(60px) translateX(20px) translateY(-20px) scale(1.2);opacity:.8}75%{opacity:.4;transform:translateZ(30px) translateX(10px) translateY(-10px) scale(1)}}.glitch-effect{position:absolute;width:100%;height:100%;top:0;left:0;opacity:0;animation:glitch 7s infinite;pointer-events:none;z-index:12;background:linear-gradient(45deg,rgba(255,0,222,.3) 0%,transparent 20%,rgba(0,221,255,.3) 40%,transparent 60%,rgba(255,0,222,.3) 80%,transparent 100%)}@keyframes glitch{0%,100%{opacity:0}94%,96%{opacity:0}94.5%{opacity:.8;transform:translate(5px,-5px) skew(-5deg,5deg)}95%{opacity:.8;transform:translate(-5px,5px) skew(5deg,-5deg)}95.5%{opacity:.8;transform:translate(5px,0) skew(-5deg,0)}}@keyframes rotate{0%{transform:rotateX(0deg) rotateY(0deg) rotateZ(0deg)}100%{transform:rotateX(360deg) rotateY(360deg) rotateZ(360deg)}}.code-lines{position:absolute;width:200%;height:200%;top:-50%;left:-50%;pointer-events:none;perspective:500px;transform-style:preserve-3d;z-index:8}.code-line{position:absolute;font-size:10px;color:rgba(0,221,255,.7);white-space:nowrap;text-shadow:0 0 5px rgba(0,221,255,.3);animation:code-scroll 15s infinite linear;opacity:0}.code-line:nth-child(1){top:10%;animation-duration:14s;color:#00ddff}.code-line:nth-child(2){top:20%;animation-duration:15s;animation-delay:-1s}.code-line:nth-child(3){top:30%;animation-duration:16s;animation-delay:-2s;color:#ff00de}.code-line:nth-child(4){top:40%;animation-duration:14s;animation-delay:-3s}.code-line:nth-child(5){top:50%;animation-duration:10s;animation-delay:-3s}.code-line:nth-child(6){top:60%;animation-duration:13s;animation-delay:-7s;color:#ff00de}.code-line:nth-child(7){top:70%;animation-duration:11s;animation-delay:-4s}.code-line:nth-child(8){top:80%;animation-duration:16s;animation-delay:-9s;color:#ff00de}@keyframes code-scroll{0%{transform:translateX(200px) rotateY(20deg);opacity:0}10%{opacity:.7}90%{opacity:.7}100%{transform:translateX(-500px) rotateY(20deg);opacity:0}}.loading-text{position:absolute;bottom:-85px;text-align:center;font-size:14px;letter-spacing:2px;color:rgba(255,255,255,.8);text-shadow:0 0 10px rgba(0,221,255,.6);animation:text-flicker 2s infinite}@keyframes text-flicker{0%,100%{opacity:1}8%,10%{opacity:.6}9%{opacity:.9}52%,54%{opacity:.6}53%{opacity:.9}}.progress-container{position:absolute;bottom:-110px;width:200px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}.progress-bar{height:100%;width:0;background:linear-gradient(90deg,#00ddff,#ff00de);box-shadow:0 0 10px rgba(0,221,255,.7);animation:progress 5s linear infinite}@keyframes progress{0%{width:0}20%{width:20%}40%{width:38%}50%{width:52%}60%{width:65%}75%{width:82%}100%{width:100%}}.corner-decorations{position:absolute;width:300px;height:300px;pointer-events:none}.corner{position:absolute;width:20px;height:20px;border-style:solid;border-width:2px;border-color:rgba(0,221,255,.5);animation:corner-pulse 3s infinite alternate}.corner:nth-child(1){top:0;left:0;border-right:none;border-bottom:none}.corner:nth-child(2){top:0;right:0;border-left:none;border-bottom:none}.corner:nth-child(3){bottom:0;left:0;border-right:none;border-top:none}.corner:nth-child(4){bottom:0;right:0;border-left:none;border-top:none}@keyframes corner-pulse{0%{border-color:rgba(0,221,255,.5);width:20px;height:20px}100%{border-color:rgba(255,0,222,.5);width:30px;height:30px}}.projection-beams{position:absolute;width:300px;height:300px;bottom:-80px;transform-style:preserve-3d;opacity:.3;pointer-events:none}.beam{position:absolute;width:1px;height:250px;background:linear-gradient(0deg,rgba(0,221,255,.8) 0%,rgba(255,255,255,.4) 40%,rgba(0,0,0,0) 100%);bottom:0;transform-origin:bottom;filter:blur(1px);opacity:.7}.beam:nth-child(1){left:30%;transform:rotateY(10deg) rotateX(-30deg);animation:beam-flicker 4s infinite alternate;animation-delay:.5s}.beam:nth-child(2){left:45%;transform:rotateY(-5deg) rotateX(-25deg);animation:beam-flicker 3s infinite alternate;animation-delay:1.5s}.beam:nth-child(3){left:55%;transform:rotateY(5deg) rotateX(-25deg);animation:beam-flicker 4s infinite alternate;animation-delay:.7s}.beam:nth-child(4){left:70%;transform:rotateY(-10deg) rotateX(-30deg);animation:beam-flicker 3.5s infinite alternate;animation-delay:2s}@keyframes beam-flicker{0%,100%{opacity:.3}50%{opacity:.7}}
+        
+        /* --- Integrated Info Box CSS (Purple/Pink Theme) --- */
+        :root {
+            --primary-color: #c000ff;
+            --secondary-color: #ff00de;
+            --bg-color: rgba(0, 0, 0, 0.7);
+            --text-color: #f0c6ff;
+        }
+        .info-box-container { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+        .info-field-container { position: relative; width: 100%; }
+        .holo-info-box { width: 100%; min-height: 250px; background: var(--bg-color); border: none; outline: none; padding: 20px; color: var(--text-color); font-family: 'Fira Code', monospace; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); border-radius: 4px; box-shadow: 0 0 15px rgba(192, 0, 255, 0.3), inset 0 0 10px rgba(0, 0, 0, 0.8); text-shadow: 0 0 5px rgba(255, 0, 222, 0.5); z-index: 1; }
+        .info-border { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; border: 1px solid rgba(192, 0, 255, 0.4); border-radius: 4px; z-index: 2; }
+        .info-border::before, .info-border::after { content: ""; position: absolute; width: 20px; height: 20px; border: 1px solid rgba(192, 0, 255, 0.7); z-index: 2; transition: all 0.3s ease; }
+        .info-border::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+        .info-border::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+        .holo-scan-line { position: absolute; width: 100%; height: 2px; background: linear-gradient(90deg, transparent 0%, var(--secondary-color) 20%, #fff 50%, var(--primary-color) 80%, transparent 100%); top: 0; left: 0; opacity: 1; filter: blur(1px); z-index: 3; pointer-events: none; animation: scan-animation 4s infinite ease-in-out; }
+        .info-glow { position: absolute; width: 100%; height: 100%; top: 0; left: 0; background: radial-gradient(ellipse at center, rgba(192, 0, 255, 0.1) 0%, transparent 70%); opacity: 1; border-radius: 4px; z-index: 0; pointer-events: none; }
+        .info-label { position: absolute; top: -30px; left: 0; color: rgba(192, 0, 255, 0.7); font-size: 14px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; pointer-events: none; text-shadow: 0 0 5px rgba(255, 0, 222, 0.5); }
+        .info-particles { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: 3; overflow: hidden; border-radius: 4px; }
+        .info-particle { position: absolute; width: 4px; height: 4px; background: var(--secondary-color); border-radius: 50%; opacity: 1; filter: blur(1px); box-shadow: 0 0 5px var(--secondary-color); animation: particle-float 5s infinite ease-in-out; animation-delay: calc(var(--index) * 0.5s); }
+        .info-holo-overlay { position: absolute; width: 100%; height: 100%; top: 0; left: 0; background-image: linear-gradient(90deg, rgba(192, 0, 255, 0.05) 25%, rgba(255, 0, 222, 0.02) 50%, rgba(192, 0, 255, 0.05) 75%); background-size: 8px 100%; opacity: 0.5; pointer-events: none; z-index: 4; mix-blend-mode: overlay; }
+        .info-status { position: absolute; bottom: -25px; right: 0; font-size: 12px; color: rgba(192, 0, 255, 0.7); letter-spacing: 1px; pointer-events: none; text-transform: uppercase; }
+        .power-indicator { position: absolute; width: 100%; height: 2px; background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%); bottom: 0; left: 0; transform-origin: left; z-index: 3; }
+        @keyframes scan-animation { 0% { top: 0; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+        @keyframes particle-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+        /* --- NeonHack UI Adaptations --- */
+        .card {
+            position: relative;
+            width: 100%;
+            background: var(--bg-color);
+            border: none;
+            outline: none;
+            padding: 20px;
+            color: var(--text-color);
+            font-family: 'Fira Code', monospace;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border-radius: 4px;
+            box-shadow: 0 0 15px rgba(192, 0, 255, 0.3), inset 0 0 10px rgba(0, 0, 0, 0.8);
+            text-shadow: 0 0 5px rgba(255, 0, 222, 0.5);
+            z-index: 1;
+            margin: 20px 0;
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            border: 1px solid rgba(192, 0, 255, 0.4);
+            border-radius: 4px;
+            z-index: 2;
+        }
+
+        .card::after {
+            content: "";
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent 0%, var(--secondary-color) 20%, #fff 50%, var(--primary-color) 80%, transparent 100%);
+            top: 0;
+            left: 0;
+            opacity: 1;
+            filter: blur(1px);
+            z-index: 3;
+            pointer-events: none;
+            animation: scan-animation 4s infinite ease-in-out;
+        }
+
+        .card-title {
+            color: #c000ff;
+            font-size: 18px;
+            font-weight: 500;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            text-shadow: 0 0 5px rgba(255, 0, 222, 0.5);
+        }
+
+        .input, textarea, select {
+            width: 100%;
+            box-sizing: border-box;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid rgba(192, 0, 255, 0.4);
+            border-radius: 4px;
+            color: var(--text-color);
+            padding: 12px 14px;
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px rgba(255, 0, 222, 0.3);
+        }
+
+        .input:focus, textarea:focus, select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 15px rgba(192, 0, 255, 0.5);
+        }
+
+        .btn {
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            padding: 12px 24px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+            box-shadow: 0 0 15px rgba(192, 0, 255, 0.3);
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+        }
+
+        .btn:hover {
+            box-shadow: 0 0 25px rgba(192, 0, 255, 0.6);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn[disabled] {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .label {
+            color: rgba(192, 0, 255, 0.7);
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .hint {
+            color: rgba(192, 0, 255, 0.6);
+            font-size: 11px;
+            margin-top: 5px;
+            opacity: 0.8;
+        }
+
+        @media(min-width:860px){
+            .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; align-items:start; }
+        }
+
+    </style>
 </head>
 <body>
-  <header class="appheader" role="banner">
-    <h1>NEONHACK // HARDENED v5.0</h1>
-    <div class="subtitle">ADVANCED CYBERPUNK SECURITY PENETRATION SUITE</div>
-  </header>
-
-  <main class="container" role="main">
-    <section class="card" aria-labelledby="auth-title">
-        <div id="auth-title" class="card-title">🔑 AUTHORIZATION</div>
-        <label class="label">API KEY</label>
-        <input id="api-key" type="password" class="input" placeholder="Enter your secret API key" />
-        <small class="hint">All actions require a valid API key configured on the server.</small>
-    </section>
-    
-    <section class="card" aria-labelledby="net-title">
-      <div id="net-title" class="card-title">◈ NETWORK SCANNER</div>
-      <div class="row">
-        <label class="label">NETWORK INTERFACE</label>
-        <select id="iface" class="input"><option value="eth0">eth0</option><option value="wlan0">wlan0</option></select>
-      </div>
-      <div class="row">
-        <label class="label">IP RANGE (CIDR)</label>
-        <input id="cidr" class="input" placeholder="192.168.1.0/24" value="192.168.1.0/24" />
-      </div>
-      <button class="btn" id="btn-arp" onclick="runArp()">INITIATE NETWORK SCAN</button>
-    </section>
-
-    <div class="grid2">
-      <section class="card" aria-labelledby="cred-title">
-        <div id="cred-title" class="card-title">🛡 PORT CONNECTIVITY</div>
-        <label class="label">TARGET IP</label>
-        <input id="cred-ip" class="input" placeholder="192.168.1.10" />
-        <label class="label">PROTOCOL</label>
-        <select id="cred-proto" class="input"><option value="ssh">SSH</option><option value="ftp">FTP</option><option value="http">HTTP</option></select>
-        <button class="btn" onclick="testCred()">RUN CONNECTIVITY TEST</button>
-        <small class="hint">Performs a simple TCP connection test to the default port.</small>
-      </section>
-
-      <section class="card" aria-labelledby="hydra-title">
-        <div id="hydra-title" class="card-title">⚔️ HYDRA ATTACK</div>
-        <label class="label">TARGET IP</label>
-        <input id="hydra-ip" class="input" placeholder="192.168.1.20" />
-        <label class="label">PROTOCOL</label>
-        <select id="hydra-proto" class="input"><option value="ssh">SSH</option><option value="ftp">FTP</option><option value="http-get">HTTP-GET</option></select>
-        <label class="label">USERNAMES (one per line)</label>
-        <textarea id="hydra-users" class="input" placeholder="root\nadmin\nuser"></textarea>
-        <label class="label">PASSWORDS (one per line)</label>
-        <textarea id="hydra-pass" class="input" placeholder="password\n123456"></textarea>
-        <button class="btn" onclick="startHydra()" id="hydra-btn">BEGIN HYDRA ATTACK</button>
-      </section>
+    <!-- Integrated Matrix Rain Background HTML -->
+    <div class="matrix-container">
+        <div class="matrix-pattern">
+            <div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div>
+        </div>
     </div>
 
-    <section class="card" aria-labelledby="exp-title">
-      <div id="exp-title" class="card-title">💣 EXPLOIT EXECUTION</div>
-      <label class="label">TARGET IP</label>
-      <input id="exp-ip" class="input" placeholder="192.168.1.30" />
-      <label class="label">MODULE (whitelisted on server)</label>
-      <select id="exp-mod" class="input">
-        <option value="exploit/unix/ftp/vsftpd_234_backdoor">exploit/unix/ftp/vsftpd_234_backdoor</option>
-        <option value="auxiliary/scanner/portscan/tcp">auxiliary/scanner/portscan/tcp</option>
-      </select>
-      <button class="btn" onclick="runExploit()">EXECUTE MODULE</button>
-      <small class="hint">Server holds MSF password. Only whitelisted modules can be run.</small>
-    </section>
+    <div class="main-content-wrapper">
+        <div class="container max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+            <header class="text-center mb-8">
+                <!-- Integrated Neon Globe HTML -->
+                <div id="globe-visual-container">
+                     <div class="loader-container">
+                        <div class="hologram-platform"></div>
+                        <div class="platform-rings"><div class="platform-ring"></div><div class="platform-ring"></div><div class="platform-ring"></div></div>
+                        <div class="projection-beams"><div class="beam"></div><div class="beam"></div><div class="beam"></div><div class="beam"></div></div>
+                        <div class="holo-container">
+                            <div class="holo-sphere">
+                                <div class="holo-ring"></div><div class="holo-ring"></div><div class="holo-ring"></div><div class="holo-ring"></div><div class="holo-ring"></div>
+                                <div class="holo-particles"><div class="holo-particle"></div><div class="holo-particle"></div><div class="holo-particle"></div><div class="holo-particle"></div><div class="holo-particle"></div><div class="holo-particle"></div><div class="holo-particle"></div><div class="holo-particle"></div><div class="holo-particle"></div><div class="holo-particle"></div><div class="holo-particle"></div><div class="holo-particle"></div></div>
+                            </div>
+                            <div class="glitch-effect"></div>
+                        </div>
+                        <div class="code-lines"><div class="code-line">01001001 01001110 01001001 01010100 01001001 01000001</div><div class="code-line">function initHolographicMatrix() { renderState(); }</div><div class="code-line">01010011 01011001 01010011 01010100 01000101 01001101</div><div class="code-line">class QuantumProcessor { constructor() {} }</div><div class="code-line">01010010 01000101 01001110 01000101 01010010</div><div class="code-line">const matrix = [1.2, 0.8, 3.1, 2.7];</div><div class="code-line">01010000 01010010 01001111 01000011 01000101 01010011</div><div class="code-line">async function loadData() { await fetch('/api'); }</div></div>
+                        <div class="loading-text">NEONHACK ONLINE</div>
+                        <div class="progress-container"><div class="progress-bar"></div></div>
+                    </div>
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-bold" style="color: #c000ff;">NEONHACK // HARDENED v5.0</h1>
+                <p class="text-gray-400 mt-2">ADVANCED CYBERPUNK SECURITY PENETRATION SUITE</p>
+            </header>
 
-    <section class="card" aria-label="log console">
-      <div class="card-title">⌘ OP CONSOLE</div>
-      <div id="log" role="log" aria-live="polite"></div>
-    </section>
-  </main>
+            <main>
+                <section class="card" aria-labelledby="auth-title">
+                    <div id="auth-title" class="card-title">🔑 AUTHORIZATION</div>
+                    <label class="label">API KEY</label>
+                    <input id="api-key" type="password" class="input" placeholder="Enter your secret API key" />
+                    <small class="hint">All actions require a valid API key configured on the server.</small>
+                </section>
+                
+                <section class="card" aria-labelledby="net-title">
+                    <div id="net-title" class="card-title">◈ NETWORK SCANNER</div>
+                    <div class="row">
+                        <label class="label">NETWORK INTERFACE</label>
+                        <select id="iface" class="input"><option value="eth0">eth0</option><option value="wlan0">wlan0</option></select>
+                    </div>
+                    <div class="row">
+                        <label class="label">IP RANGE (CIDR)</label>
+                        <input id="cidr" class="input" placeholder="192.168.1.0/24" value="192.168.1.0/24" />
+                    </div>
+                    <button class="btn" id="btn-arp" onclick="runArp()">INITIATE NETWORK SCAN</button>
+                </section>
+
+                <div class="grid2">
+                    <section class="card" aria-labelledby="cred-title">
+                        <div id="cred-title" class="card-title">🛡 PORT CONNECTIVITY</div>
+                        <label class="label">TARGET IP</label>
+                        <input id="cred-ip" class="input" placeholder="192.168.1.10" />
+                        <label class="label">PROTOCOL</label>
+                        <select id="cred-proto" class="input"><option value="ssh">SSH</option><option value="ftp">FTP</option><option value="http">HTTP</option></select>
+                        <button class="btn" onclick="testCred()">RUN CONNECTIVITY TEST</button>
+                        <small class="hint">Performs a simple TCP connection test to the default port.</small>
+                    </section>
+
+                    <section class="card" aria-labelledby="hydra-title">
+                        <div id="hydra-title" class="card-title">⚔️ HYDRA ATTACK</div>
+                        <label class="label">TARGET IP</label>
+                        <input id="hydra-ip" class="input" placeholder="192.168.1.20" />
+                        <label class="label">PROTOCOL</label>
+                        <select id="hydra-proto" class="input"><option value="ssh">SSH</option><option value="ftp">FTP</option><option value="http-get">HTTP-GET</option></select>
+                        <label class="label">USERNAMES (one per line)</label>
+                        <textarea id="hydra-users" class="input" placeholder="root\nadmin\nuser"></textarea>
+                        <label class="label">PASSWORDS (one per line)</label>
+                        <textarea id="hydra-pass" class="input" placeholder="password\n123456"></textarea>
+                        <button class="btn" onclick="startHydra()" id="hydra-btn">BEGIN HYDRA ATTACK</button>
+                    </section>
+                </div>
+
+                <section class="card" aria-labelledby="exp-title">
+                    <div id="exp-title" class="card-title">💣 EXPLOIT EXECUTION</div>
+                    <label class="label">TARGET IP</label>
+                    <input id="exp-ip" class="input" placeholder="192.168.1.30" />
+                    <label class="label">MODULE (whitelisted on server)</label>
+                    <select id="exp-mod" class="input">
+                        <option value="exploit/unix/ftp/vsftpd_234_backdoor">exploit/unix/ftp/vsftpd_234_backdoor</option>
+                        <option value="auxiliary/scanner/portscan/tcp">auxiliary/scanner/portscan/tcp</option>
+                    </select>
+                    <button class="btn" onclick="runExploit()">EXECUTE MODULE</button>
+                    <small class="hint">Server holds MSF password. Only whitelisted modules can be run.</small>
+                </section>
+
+                <!-- Integrated Info Box HTML for Console -->
+                <div class="mt-12 info-box-container">
+                    <div class="info-field-container">
+                        <div class="info-label">● OP CONSOLE</div>
+                        <div class="info-border"></div>
+                        <div class="holo-scan-line"></div>
+                        <div class="info-glow"></div>
+                        <div class="power-indicator"></div>
+                        <div class="info-status">SYSTEM STATUS: STANDBY</div>
+                        <div class="info-particles">
+                            <div class="info-particle" style="--index: 1; top: 20%; left: 10%;"></div><div class="info-particle" style="--index: 2; top: 65%; left: 25%;"></div><div class="info-particle" style="--index: 3; top: 40%; left: 80%;"></div><div class="info-particle" style="--index: 4; top: 75%; left: 60%;"></div><div class="info-particle" style="--index: 5; top: 30%; left: 45%;"></div><div class="info-particle" style="--index: 6; top: 80%; left: 90%;"></div>
+                        </div>
+                        <div class="info-holo-overlay"></div>
+
+                        <div class="holo-info-box">
+                            <div id="log" role="log" aria-live="polite"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
 
 <script>
 const logEl = document.getElementById('log');
