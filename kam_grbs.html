@@ -286,9 +286,10 @@
                     <div class="relative">
                       <input
                         class="w-full bg-transparent text-green-300 text-base border-2 border-green-500 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-green-600 placeholder-green-600/60 pr-10"
-                        placeholder="➤ ENTER API KEY"
+                        placeholder="➤ ENTER API KEY (Press Enter to validate)"
                         id="api-key"
                         type="password"
+                        onkeypress="if(event.key==='Enter') validateApiKey()"
                       />
 
                       <svg
@@ -307,7 +308,12 @@
                       </svg>
                     </div>
 
-                    <button class="btn mt-4" onclick="validateApiKey()" id="api-submit-btn">
+                    <div class="mt-2 text-xs text-green-400 opacity-75 flex items-center justify-center">
+                      <span class="mr-1">💡</span>
+                      <span>Press Enter or click the button below to validate</span>
+                    </div>
+
+                    <button class="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 px-4 rounded-md mt-4 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-50 shadow-lg" onclick="validateApiKey()" id="api-submit-btn">
                       🔐 VALIDATE API KEY
                     </button>
 
@@ -621,14 +627,24 @@ function getApiKey() { return document.getElementById('api-key').value; }
 function validateApiKey() {
     const apiKey = getApiKey();
     const btn = document.getElementById('api-submit-btn');
+    const input = document.getElementById('api-key');
     
     if (!apiKey || apiKey.trim() === '') {
         appendLog('❌ Please enter an API key');
+        // Flash the input border red
+        input.style.borderColor = '#ef4444';
+        setTimeout(() => {
+            input.style.borderColor = '#10b981';
+        }, 1000);
         return;
     }
     
     setButtonLoading(btn, true);
     appendLog('🔐 Validating API key...');
+    
+    // Change button appearance during validation
+    btn.textContent = '🔄 VALIDATING...';
+    btn.disabled = true;
     
     // Test API key with a simple endpoint
     fetch('/api/test', {
@@ -638,15 +654,41 @@ function validateApiKey() {
     .then(response => {
         if (response.ok) {
             appendLog('✅ API key validated successfully');
+            // Flash input border green
+            input.style.borderColor = '#22c55e';
+            input.style.boxShadow = '0 0 0 2px rgba(34, 197, 94, 0.2)';
+            // Change button to success state
+            btn.textContent = '✅ API KEY VALID';
+            btn.style.background = 'linear-gradient(to right, #22c55e, #16a34a)';
         } else {
             appendLog('❌ Invalid API key or server error');
+            // Flash input border red
+            input.style.borderColor = '#ef4444';
+            input.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.2)';
         }
     })
     .catch(error => {
         appendLog('❌ Failed to validate API key: ' + error.message);
+        // Flash input border red
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.2)';
     })
     .finally(() => {
         setButtonLoading(btn, false);
+        btn.disabled = false;
+        
+        // Reset button text after 3 seconds if it was successful
+        setTimeout(() => {
+            if (btn.textContent === '✅ API KEY VALID') {
+                btn.textContent = '🔐 VALIDATE API KEY';
+                btn.style.background = '';
+            } else {
+                btn.textContent = '🔐 VALIDATE API KEY';
+            }
+            // Reset input styles
+            input.style.borderColor = '#10b981';
+            input.style.boxShadow = '';
+        }, 3000);
     });
 }
 
