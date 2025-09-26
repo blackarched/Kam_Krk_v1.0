@@ -30,11 +30,20 @@
         .fade-in { animation: fadeIn 0.5s ease-out forwards; }
 
         /* --- Integrated Matrix Rain CSS (for background) --- */
-        .matrix-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; display: flex; overflow: hidden; z-index: -1; }
-        .matrix-pattern { position: relative; width: 1000px; height: 100%; flex-shrink: 0; }
+        .matrix-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; min-height: 100vh; background: #000; overflow: hidden; z-index: -1; pointer-events: none; }
+        .matrix-pattern { position: absolute; width: 100%; height: 100%; }
         .matrix-column { position: absolute; top: -100%; width: 20px; height: 100%; font-size: 16px; line-height: 18px; font-weight: bold; animation: fall linear infinite; white-space: nowrap; }
-        .matrix-column::before { content: "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; position: absolute; top: 0; left: 0; background: linear-gradient( to bottom, #ffffff 0%, #ffffff 5%, #00ff41 10%, #00ff41 20%, #00dd33 30%, #00bb22 40%, #009911 50%, #007700 60%, #005500 70%, #003300 80%, rgba(0, 255, 65, 0.5) 90%, transparent 100% ); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; writing-mode: vertical-lr; letter-spacing: 1px; }
-        .matrix-column:nth-child(1){left:0px;animation-delay:-2.5s;animation-duration:3s}.matrix-column:nth-child(2){left:25px;animation-delay:-3.2s;animation-duration:4s}.matrix-column:nth-child(3){left:50px;animation-delay:-1.8s;animation-duration:2.5s}.matrix-column:nth-child(4){left:75px;animation-delay:-2.9s;animation-duration:3.5s}.matrix-column:nth-child(5){left:100px;animation-delay:-1.5s;animation-duration:3s}.matrix-column:nth-child(6){left:125px;animation-delay:-3.8s;animation-duration:4.5s}.matrix-column:nth-child(7){left:150px;animation-delay:-2.1s;animation-duration:2.8s}.matrix-column:nth-child(8){left:175px;animation-delay:-2.7s;animation-duration:3.2s}.matrix-column:nth-child(9){left:200px;animation-delay:-3.4s;animation-duration:3.8s}.matrix-column:nth-child(10){left:225px;animation-delay:-1.9s;animation-duration:2.7s}.matrix-column:nth-child(11){left:250px;animation-delay:-3.6s;animation-duration:4.2s}.matrix-column:nth-child(12){left:275px;animation-delay:-2.3s;animation-duration:3.1s}.matrix-column:nth-child(13){left:300px;animation-delay:-3.1s;animation-duration:3.6s}.matrix-column:nth-child(14){left:325px;animation-delay:-2.6s;animation-duration:2.9s}.matrix-column:nth-child(15){left:350px;animation-delay:-3.7s;animation-duration:4.1s}.matrix-column:nth-child(16){left:375px;animation-delay:-2.8s;animation-duration:3.3s}.matrix-column:nth-child(17){left:400px;animation-delay:-3.3s;animation-duration:3.7s}.matrix-column:nth-child(18){left:425px;animation-delay:-2.2s;animation-duration:2.6s}.matrix-column:nth-child(19){left:450px;animation-delay:-3.9s;animation-duration:4.3s}.matrix-column:nth-child(20){left:475px;animation-delay:-2.4s;animation-duration:3.4s}.matrix-column:nth-child(21){left:500px;animation-delay:-1.7s;animation-duration:2.4s}.matrix-column:nth-child(22){left:525px;animation-delay:-3.5s;animation-duration:3.9s}.matrix-column:nth-child(23){left:550px;animation-delay:-2s;animation-duration:3s}.matrix-column:nth-child(24){left:575px;animation-delay:-4s;animation-duration:4.4s}.matrix-column:nth-child(25){left:600px;animation-delay:-1.6s;animation-duration:2.3s}.matrix-column:nth-child(26){left:625px;animation-delay:-3s;animation-duration:3.5s}.matrix-column:nth-child(27){left:650px;animation-delay:-3.8s;animation-duration:4s}.matrix-column:nth-child(28){left:675px;animation-delay:-2.5s;animation-duration:2.8s}.matrix-column:nth-child(29){left:700px;animation-delay:-3.2s;animation-duration:3.6s}.matrix-column:nth-child(30){left:725px;animation-delay:-2.7s;animation-duration:3.2s}.matrix-column:nth-child(31){left:750px;animation-delay:-1.8s;animation-duration:2.7s}.matrix-column:nth-child(32){left:775px;animation-delay:-3.6s;animation-duration:4.1s}.matrix-column:nth-child(33){left:800px;animation-delay:-2.1s;animation-duration:3.1s}.matrix-column:nth-child(34){left:825px;animation-delay:-3.4s;animation-duration:3.7s}.matrix-column:nth-child(35){left:850px;animation-delay:-2.8s;animation-duration:2.9s}.matrix-column:nth-child(36){left:875px;animation-delay:-3.7s;animation-duration:4.2s}.matrix-column:nth-child(37){left:900px;animation-delay:-2.3s;animation-duration:3.3s}.matrix-column:nth-child(38){left:925px;animation-delay:-1.9s;animation-duration:2.5s}.matrix-column:nth-child(39){left:950px;animation-delay:-3.5s;animation-duration:3.8s}.matrix-column:nth-child(40){left:975px;animation-delay:-2.6s;animation-duration:3.4s}
+        .matrix-column::before { content: "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; position: absolute; top: 0; left: 0; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; writing-mode: vertical-lr; letter-spacing: 1px; }
+        
+        /* Green Matrix Columns (Default) */
+        .matrix-column.green::before { background: linear-gradient( to bottom, #ffffff 0%, #ffffff 5%, #00ff41 10%, #00ff41 20%, #00dd33 30%, #00bb22 40%, #009911 50%, #007700 60%, #005500 70%, #003300 80%, rgba(0, 255, 65, 0.5) 90%, transparent 100% ); }
+        
+        /* Pink Matrix Columns */
+        .matrix-column.pink::before { background: linear-gradient( to bottom, #ffffff 0%, #ffffff 5%, #ff00de 10%, #ff00de 20%, #dd00bb 30%, #bb0099 40%, #990077 50%, #770055 60%, #550033 70%, #330022 80%, rgba(255, 0, 222, 0.5) 90%, transparent 100% ); }
+        
+        /* Cyan Matrix Columns */
+        .matrix-column.cyan::before { background: linear-gradient( to bottom, #ffffff 0%, #ffffff 5%, #00ddff 10%, #00ddff 20%, #00bbdd 30%, #0099bb 40%, #007799 50%, #005577 60%, #003355 70%, #002233 80%, rgba(0, 221, 255, 0.5) 90%, transparent 100% ); }
+        /* Matrix column positions and animations are now handled dynamically by JavaScript */
         .matrix-column:nth-child(odd)::before{content:"アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン123456789"}.matrix-column:nth-child(even)::before{content:"ガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポヴァィゥェォャュョッABCDEFGHIJKLMNOPQRSTUVWXYZ"}.matrix-column:nth-child(3n)::before{content:"アカサタナハマヤラワイキシチニヒミリウクスツヌフムユルエケセテネヘメレオコソトノホモヨロヲン0987654321"}.matrix-column:nth-child(4n)::before{content:"ンヲロヨモホノトソコオレメヘネテセケエルユムフヌツスクウリミヒニチシキイワラヤマハナタサカア"}.matrix-column:nth-child(5n)::before{content:"ガザダバパギジヂビピグズヅブプゲゼデベペゴゾドボポヴァィゥェォャュョッ!@#$%^&*()_+-=[]{}|;:,.<>?"}
         @keyframes fall{0%{transform:translateY(-10%);opacity:1}100%{transform:translateY(200%);opacity:0}}
         @media (max-width:768px){.matrix-column{font-size:14px;line-height:16px;width:18px}} @media (max-width:480px){.matrix-column{font-size:12px;line-height:14px;width:15px}}
@@ -209,100 +218,15 @@
             .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; align-items:start; }
         }
 
-        /* From Uiverse.io by Smit-Prajapati */ 
-        .button {
-          /* in scss with just one variable i can change opacity with rgba(variable, opacity) but in css it's not possible so i have used three seperate variables */
-          /* with hue-rotate color can be changed */
-          --main-color: rgb(46, 213, 115);
-          --main-bg-color: rgba(46, 213, 116, 0.36);
-          --pattern-color: rgba(46, 213, 116, 0.073);
-
-          /* change this rotation value */
-          filter: hue-rotate(0deg);
-
-          cursor: pointer;
-          text-transform: uppercase;
-          letter-spacing: 0.5rem;
-          background: radial-gradient(
-              circle,
-              var(--main-bg-color) 0%,
-              rgba(0, 0, 0, 0) 95%
-            ),
-            linear-gradient(var(--pattern-color) 1px, transparent 1px),
-            linear-gradient(to right, var(--pattern-color) 1px, transparent 1px);
-          background-size:
-            cover,
-            15px 15px,
-            15px 15px;
-          background-position:
-            center center,
-            center center,
-            center center;
-          border-image: radial-gradient(
-              circle,
-              var(--main-color) 0%,
-              rgba(0, 0, 0, 0) 100%
-            )
-            1;
-          border-width: 1px 0 1px 0;
-          color: var(--main-color);
-          padding: 1rem 3rem;
-          font-weight: 700;
-          font-size: 1.5rem;
-          transition: background-size 0.2s ease-in-out;
-          border-style: solid;
-          border-left: none;
-          border-right: none;
-          width: 100%;
-          margin-top: 1rem;
-        }
-
-        .button:hover {
-          background-size:
-            cover,
-            10px 10px,
-            10px 10px;
-        }
-        .button:active {
-          filter: hue-rotate(250deg);
-        }
-
-        /* Color variants for different button types */
-        .button.scan-button {
-          --main-color: rgb(34, 197, 94);
-          --main-bg-color: rgba(34, 197, 94, 0.36);
-          --pattern-color: rgba(34, 197, 94, 0.073);
-          filter: hue-rotate(0deg);
-        }
-
-        .button.attack-button {
-          --main-color: rgb(239, 68, 68);
-          --main-bg-color: rgba(239, 68, 68, 0.36);
-          --pattern-color: rgba(239, 68, 68, 0.073);
-          filter: hue-rotate(0deg);
-        }
-
-        .button.exploit-button {
-          --main-color: rgb(249, 115, 22);
-          --main-bg-color: rgba(249, 115, 22, 0.36);
-          --pattern-color: rgba(249, 115, 22, 0.073);
-          filter: hue-rotate(0deg);
-        }
-
-        .button.camera-button {
-          --main-color: rgb(168, 85, 247);
-          --main-bg-color: rgba(168, 85, 247, 0.36);
-          --pattern-color: rgba(168, 85, 247, 0.073);
-          filter: hue-rotate(0deg);
-        }
+        /* Removed unused large button styles - all buttons now use .btn class for consistent sizing */
 
     </style>
 </head>
 <body>
     <!-- Integrated Matrix Rain Background HTML -->
     <div class="matrix-container">
-        <div class="matrix-pattern">
-            <div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div><div class="matrix-column"></div>
+        <div class="matrix-pattern" id="matrix-pattern">
+            <!-- Matrix columns will be generated dynamically by JavaScript -->
         </div>
     </div>
 
@@ -362,9 +286,10 @@
                     <div class="relative">
                       <input
                         class="w-full bg-transparent text-green-300 text-base border-2 border-green-500 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-green-600 placeholder-green-600/60 pr-10"
-                        placeholder="➤ ENTER API KEY"
+                        placeholder="➤ ENTER API KEY (Press Enter to validate)"
                         id="api-key"
                         type="password"
+                        onkeypress="if(event.key==='Enter') validateApiKey()"
                       />
 
                       <svg
@@ -382,6 +307,15 @@
                         ></path>
                       </svg>
                     </div>
+
+                    <div class="mt-2 text-xs text-green-400 opacity-75 flex items-center justify-center">
+                      <span class="mr-1">💡</span>
+                      <span>Press Enter or click the button below to validate</span>
+                    </div>
+
+                    <button class="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 px-4 rounded-md mt-4 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-50 shadow-lg" onclick="validateApiKey()" id="api-submit-btn">
+                      🔐 VALIDATE API KEY
+                    </button>
 
                     <div class="mt-4 flex flex-col gap-2">
                       <p class="text-xs text-green-500 opacity-80 flex items-center gap-2">
@@ -406,7 +340,7 @@
                     <div id="cam-title" class="card-title">📷 WiFi Camera Scanner</div>
                     <label class="label">TARGET NETWORK (CIDR)</label>
                     <input id="camera-cidr" class="input" placeholder="192.168.1.0/24" value="192.168.1.0/24" />
-                    <button class="button camera-button" id="btn-cam-scan" onclick="startCameraScan()">SCAN FOR CAMERAS</button>
+                    <button class="btn" id="btn-cam-scan" onclick="startCameraScan()">📷 SCAN FOR CAMERAS</button>
                     <small class="hint">This scan may require root privileges on the server to function correctly.</small>
                     <div id="camera-results"></div>
                 </section>
@@ -415,7 +349,7 @@
                     <div id="net-title" class="card-title">◈ NETWORK SCANNER</div>
                     <label class="label">NETWORK INTERFACE</label><select id="iface" class="input"><option value="eth0">eth0</option><option value="wlan0">wlan0</option></select>
                     <label class="label">IP RANGE (CIDR)</label><input id="cidr" class="input" placeholder="192.168.1.0/24" value="192.168.1.0/24" />
-                    <button class="button scan-button" id="btn-arp" onclick="runArp()">INITIATE NETWORK SCAN</button>
+                    <button class="btn" id="btn-arp" onclick="runArp()">🔍 INITIATE NETWORK SCAN</button>
                 </section>
                 
                 <div class="grid2">
@@ -485,7 +419,7 @@
                                 ></textarea>
                               </div>
 
-                              <button class="button attack-button" onclick="startHydra()" id="hydra-btn">
+                              <button class="btn" onclick="startHydra()" id="hydra-btn">
                                 ⚔️ INITIATE BRUTE FORCE ATTACK
                               </button>
                             </div>
@@ -552,7 +486,7 @@
                             </select>
                           </div>
 
-                          <button class="button exploit-button" onclick="runExploit()">
+                          <button class="btn" onclick="runExploit()">
                             💣 EXECUTE EXPLOIT MODULE
                           </button>
                         </div>
@@ -609,10 +543,154 @@
     </div>
 
 <script>
+// --- Matrix Rain Dynamic Generation ---
+function initializeMatrixRain() {
+    const matrixPattern = document.getElementById('matrix-pattern');
+    const matrixContainer = document.querySelector('.matrix-container');
+    
+    // Ensure full coverage of viewport and document
+    const screenWidth = Math.max(window.innerWidth, document.documentElement.scrollWidth);
+    const screenHeight = Math.max(window.innerHeight, document.documentElement.scrollHeight);
+    
+    // Update container dimensions to cover full page content
+    matrixContainer.style.width = screenWidth + 'px';
+    matrixContainer.style.height = screenHeight + 'px';
+    
+    const columnWidth = 25; // 20px width + 5px spacing
+    const numColumns = Math.ceil(screenWidth / columnWidth) + 10; // Extra columns for overflow
+    
+    // Color variants for matrix columns
+    const colors = ['green', 'pink', 'cyan'];
+    
+    // Clear existing columns
+    matrixPattern.innerHTML = '';
+    
+    // Generate matrix columns dynamically
+    for (let i = 0; i < numColumns; i++) {
+        const column = document.createElement('div');
+        
+        // Randomly assign color class
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        column.className = `matrix-column ${randomColor}`;
+        
+        // Set position and animation properties
+        const leftPos = i * columnWidth;
+        const animationDelay = -(Math.random() * 4); // Random delay between 0 and -4s
+        const animationDuration = 2.5 + Math.random() * 2; // Duration between 2.5s and 4.5s
+        
+        column.style.left = leftPos + 'px';
+        column.style.animationDelay = animationDelay + 's';
+        column.style.animationDuration = animationDuration + 's';
+        
+        matrixPattern.appendChild(column);
+    }
+}
+
+// Function to randomly change colors of existing columns
+function randomizeMatrixColors() {
+    const columns = document.querySelectorAll('.matrix-column');
+    const colors = ['green', 'pink', 'cyan'];
+    
+    columns.forEach(column => {
+        // Remove existing color classes
+        column.classList.remove('green', 'pink', 'cyan');
+        
+        // Add random color class
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        column.classList.add(randomColor);
+    });
+}
+
+// Periodically change colors for dynamic effect
+setInterval(randomizeMatrixColors, 3000); // Change colors every 3 seconds
+
+// Initialize matrix rain on load and resize
+window.addEventListener('load', initializeMatrixRain);
+window.addEventListener('resize', initializeMatrixRain);
+
+// Update matrix dimensions when page content changes
+let resizeTimeout;
+window.addEventListener('scroll', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        const matrixContainer = document.querySelector('.matrix-container');
+        const screenHeight = Math.max(window.innerHeight, document.documentElement.scrollHeight);
+        matrixContainer.style.height = screenHeight + 'px';
+    }, 100);
+});
+
 // --- Original Core Functionality (Preserved) ---
 const logEl = document.getElementById('log');
 const runningJobs = new Map();
 function getApiKey() { return document.getElementById('api-key').value; }
+
+function validateApiKey() {
+    const apiKey = getApiKey();
+    const btn = document.getElementById('api-submit-btn');
+    const input = document.getElementById('api-key');
+    
+    if (!apiKey || apiKey.trim() === '') {
+        appendLog('❌ Please enter an API key');
+        // Flash the input border red
+        input.style.borderColor = '#ef4444';
+        setTimeout(() => {
+            input.style.borderColor = '#10b981';
+        }, 1000);
+        return;
+    }
+    
+    setButtonLoading(btn, true);
+    appendLog('🔐 Validating API key...');
+    
+    // Change button appearance during validation
+    btn.textContent = '🔄 VALIDATING...';
+    btn.disabled = true;
+    
+    // Test API key with a simple endpoint
+    fetch('/api/test', {
+        method: 'GET',
+        headers: { 'X-API-Key': apiKey }
+    })
+    .then(response => {
+        if (response.ok) {
+            appendLog('✅ API key validated successfully');
+            // Flash input border green
+            input.style.borderColor = '#22c55e';
+            input.style.boxShadow = '0 0 0 2px rgba(34, 197, 94, 0.2)';
+            // Change button to success state
+            btn.textContent = '✅ API KEY VALID';
+            btn.style.background = 'linear-gradient(to right, #22c55e, #16a34a)';
+        } else {
+            appendLog('❌ Invalid API key or server error');
+            // Flash input border red
+            input.style.borderColor = '#ef4444';
+            input.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.2)';
+        }
+    })
+    .catch(error => {
+        appendLog('❌ Failed to validate API key: ' + error.message);
+        // Flash input border red
+        input.style.borderColor = '#ef4444';
+        input.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.2)';
+    })
+    .finally(() => {
+        setButtonLoading(btn, false);
+        btn.disabled = false;
+        
+        // Reset button text after 3 seconds if it was successful
+        setTimeout(() => {
+            if (btn.textContent === '✅ API KEY VALID') {
+                btn.textContent = '🔐 VALIDATE API KEY';
+                btn.style.background = '';
+            } else {
+                btn.textContent = '🔐 VALIDATE API KEY';
+            }
+            // Reset input styles
+            input.style.borderColor = '#10b981';
+            input.style.boxShadow = '';
+        }, 3000);
+    });
+}
 
 function setButtonLoading(button, loading = true) {
     if (!button) return;
