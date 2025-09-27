@@ -531,7 +531,306 @@ class AttackFramework:
 # Initialize attack framework
 attack_framework = AttackFramework()
 
-# --- 7. Custom Error Handling ---
+# --- 7. Result Parsing and Formatting System ---
+class ResultParser:
+    """Parse and format attack results for better user understanding"""
+    
+    @staticmethod
+    def parse_hydra_output(raw_output, stderr_output=None):
+        """Parse Hydra output and provide meaningful summary"""
+        if not raw_output:
+            return {
+                "summary": "No output received from Hydra",
+                "credentials_found": False,
+                "total_attempts": 0,
+                "successful_logins": [],
+                "user_message": "The attack completed but no credentials were discovered. Consider trying different wordlists or verifying the target is accessible."
+            }
+        
+        # Parse successful credentials
+        successful_logins = []
+        lines = raw_output.split('\n')
+        
+        for line in lines:
+            if 'login:' in line.lower() and 'password:' in line.lower():
+                # Extract login and password from Hydra output format
+                try:
+                    parts = line.split()
+                    login_idx = next(i for i, part in enumerate(parts) if 'login:' in part.lower())
+                    pass_idx = next(i for i, part in enumerate(parts) if 'password:' in part.lower())
+                    
+                    login = parts[login_idx].split(':')[1] if ':' in parts[login_idx] else parts[login_idx + 1]
+                    password = parts[pass_idx].split(':')[1] if ':' in parts[pass_idx] else parts[pass_idx + 1]
+                    
+                    successful_logins.append({
+                        "username": login,
+                        "password": password,
+                        "service": "detected from context"
+                    })
+                except (IndexError, StopIteration):
+                    # Fallback parsing
+                    if 'login:' in line and 'password:' in line:
+                        successful_logins.append({"raw_line": line.strip()})
+        
+        # Count total attempts (approximate)
+        attempt_indicators = ['Trying', 'attempting', 'tested']
+        total_attempts = sum(raw_output.lower().count(indicator) for indicator in attempt_indicators)
+        
+        # Generate user-friendly summary
+        if successful_logins:
+            summary = f"🎉 Success! Found {len(successful_logins)} valid credential(s)"
+            user_message = f"Attack successful! Discovered {len(successful_logins)} working login(s). Use these credentials carefully and ensure you have proper authorization."
+        else:
+            summary = "❌ Attack completed but no valid credentials found"
+            user_message = "The brute force attack finished scanning all provided credentials but didn't find any valid combinations. Consider expanding your wordlists or verifying the target service is accessible."
+        
+        return {
+            "summary": summary,
+            "credentials_found": len(successful_logins) > 0,
+            "total_attempts": max(total_attempts, len(successful_logins)),
+            "successful_logins": successful_logins,
+            "user_message": user_message,
+            "raw_output": raw_output[:500] + "..." if len(raw_output) > 500 else raw_output
+        }
+    
+    @staticmethod
+    def parse_metasploit_output(result_dict):
+        """Parse Metasploit exploit results for better understanding"""
+        status = result_dict.get('status', 'unknown')
+        
+        if status == 'success':
+            session_id = result_dict.get('session_id')
+            session_details = result_dict.get('details', {})
+            
+            return {
+                "summary": f"🎉 Exploit successful! Session {session_id} opened",
+                "exploit_successful": True,
+                "session_info": {
+                    "session_id": session_id,
+                    "session_type": session_details.get('type', 'unknown'),
+                    "target_info": session_details.get('info', 'N/A')
+                },
+                "user_message": f"Exploitation successful! A session has been established. You can now interact with the compromised system.",
+                "next_steps": [
+                    f"Use 'sessions -i {session_id}' to interact with the session",
+                    "Run 'sysinfo' to gather system information",
+                    "Consider privilege escalation if needed"
+                ]
+            }
+        elif status == 'timeout':
+            return {
+                "summary": "⏰ Exploit timed out - no session created",
+                "exploit_successful": False,
+                "user_message": "The exploit was launched but didn't create a session within the timeout period. The target may not be vulnerable or needs more time.",
+                "troubleshooting": [
+                    "Verify the target is running the vulnerable service",
+                    "Try increasing the timeout value",
+                    "Check network connectivity"
+                ]
+            }
+        else:
+            return {
+                "summary": "❌ Exploit failed to execute",
+                "exploit_successful": False,
+                "user_message": "The exploit could not be executed successfully. This is usually due to configuration issues or the target not being vulnerable.",
+                "troubleshooting": [
+                    "Verify Metasploit RPC service is running",
+                    "Check if the target is reachable",
+                    "Ensure the exploit module exists"
+                ]
+            }
+
+# --- 8. User-Friendly Error Translation System ---
+class ErrorTranslator:
+    """Translate technical errors into user-friendly, actionable messages"""
+    
+    @staticmethod
+    def translate_hydra_error(error_message):
+        """Translate Hydra-specific errors into user guidance"""
+        error_lower = error_message.lower()
+        
+        if 'binary not found' in error_lower or 'command not found' in error_lower:
+            return {
+                "user_message": "Hydra tool is not installed or not in system PATH",
+                "solution": "Install Hydra using your package manager (e.g., 'apt install hydra' or 'yum install hydra')",
+                "severity": "configuration_error"
+            }
+        elif 'connection refused' in error_lower:
+            return {
+                "user_message": "Cannot connect to the target service",
+                "solution": "Verify the target IP and port are correct, and the service is running and accessible",
+                "severity": "connectivity_error"
+            }
+        elif 'timeout' in error_lower:
+            return {
+                "user_message": "The attack timed out before completion",
+                "solution": "Try increasing the timeout value, reducing wordlist size, or checking network connectivity",
+                "severity": "timeout_error"
+            }
+        else:
+            return {
+                "user_message": "An unexpected error occurred during the brute force attack",
+                "solution": "Check your parameters and verify the target is accessible",
+                "severity": "unknown_error"
+            }
+    
+    @staticmethod
+    def translate_metasploit_error(error_message):
+        """Translate Metasploit-specific errors into user guidance"""
+        error_lower = error_message.lower()
+        
+        if 'connection refused' in error_lower or 'msfrpcd' in error_lower:
+            return {
+                "user_message": "Cannot connect to Metasploit RPC service",
+                "solution": "Start the Metasploit RPC daemon with 'msfrpcd -P <password> -S'",
+                "severity": "service_error"
+            }
+        elif 'authentication' in error_lower:
+            return {
+                "user_message": "Authentication to Metasploit failed",
+                "solution": "Check the MSF_PASSWORD environment variable matches your RPC daemon password",
+                "severity": "authentication_error"
+            }
+        else:
+            return {
+                "user_message": "An error occurred while executing the exploit",
+                "solution": "Review the configuration and ensure your target setup is correct",
+                "severity": "execution_error"
+            }
+
+# --- 9. Parameter Validation and Guidance System ---
+class ParameterValidator:
+    """Provide parameter validation and user guidance for API endpoints"""
+    
+    @staticmethod
+    def validate_hydra_params(data):
+        """Validate Hydra attack parameters with detailed guidance"""
+        errors = []
+        warnings = []
+        suggestions = []
+        
+        # Required parameters
+        if not data.get('ip'):
+            errors.append({
+                "field": "ip",
+                "message": "Target IP address is required",
+                "example": "192.168.1.10"
+            })
+        
+        if not data.get('protocol'):
+            errors.append({
+                "field": "protocol", 
+                "message": "Protocol is required",
+                "allowed_values": ["ssh", "ftp", "http-get"],
+                "example": "ssh"
+            })
+        elif data.get('protocol') not in ['ssh', 'ftp', 'http-get']:
+            errors.append({
+                "field": "protocol",
+                "message": f"Invalid protocol '{data.get('protocol')}'",
+                "allowed_values": ["ssh", "ftp", "http-get"]
+            })
+        
+        username_wordlist = data.get('username_wordlist', '')
+        if not username_wordlist.strip():
+            errors.append({
+                "field": "username_wordlist",
+                "message": "Username wordlist is required",
+                "example": "admin\\nroot\\nuser\\ntest",
+                "description": "Provide usernames separated by newlines"
+            })
+        else:
+            usernames = [u.strip() for u in username_wordlist.split('\n') if u.strip()]
+            if len(usernames) > 1000:
+                warnings.append({
+                    "field": "username_wordlist",
+                    "message": f"Large wordlist ({len(usernames)} usernames) may take a long time",
+                    "suggestion": "Consider using a smaller, targeted wordlist for faster results"
+                })
+            elif len(usernames) < 5:
+                suggestions.append({
+                    "field": "username_wordlist", 
+                    "message": "Small wordlist may limit success chances",
+                    "suggestion": "Consider adding common usernames like 'admin', 'root', 'guest'"
+                })
+        
+        password_wordlist = data.get('password_wordlist', '')
+        if not password_wordlist.strip():
+            errors.append({
+                "field": "password_wordlist",
+                "message": "Password wordlist is required", 
+                "example": "password\\n123456\\nadmin\\ntest",
+                "description": "Provide passwords separated by newlines"
+            })
+        else:
+            passwords = [p.strip() for p in password_wordlist.split('\n') if p.strip()]
+            if len(passwords) > 1000:
+                warnings.append({
+                    "field": "password_wordlist",
+                    "message": f"Large wordlist ({len(passwords)} passwords) may take a long time",
+                    "suggestion": "Consider using a smaller, targeted wordlist for faster results"
+                })
+        
+        # Optional parameters with guidance
+        timeout = data.get('timeout', 300)
+        if timeout < 60:
+            warnings.append({
+                "field": "timeout",
+                "message": "Short timeout may not allow attack to complete",
+                "suggestion": "Consider using at least 60 seconds for timeout"
+            })
+        elif timeout > 3600:
+            warnings.append({
+                "field": "timeout", 
+                "message": "Very long timeout may consume excessive resources",
+                "suggestion": "Consider using a timeout under 1 hour (3600 seconds)"
+            })
+        
+        return {
+            "valid": len(errors) == 0,
+            "errors": errors,
+            "warnings": warnings,
+            "suggestions": suggestions
+        }
+    
+    @staticmethod
+    def validate_metasploit_params(data):
+        """Validate Metasploit exploit parameters with guidance"""
+        errors = []
+        warnings = []
+        suggestions = []
+        
+        if not data.get('ip'):
+            errors.append({
+                "field": "ip",
+                "message": "Target IP address is required",
+                "example": "192.168.1.10"
+            })
+        
+        if not data.get('module'):
+            errors.append({
+                "field": "module",
+                "message": "Exploit module is required",
+                "example": "exploit/unix/ftp/vsftpd_234_backdoor",
+                "description": "Use format: type/category/module_name"
+            })
+        
+        timeout = data.get('timeout', 60)
+        if timeout < 10:
+            warnings.append({
+                "field": "timeout",
+                "message": "Very short timeout may not allow exploit to complete",
+                "suggestion": "Consider using at least 10 seconds"
+            })
+        
+        return {
+            "valid": len(errors) == 0,
+            "errors": errors,
+            "warnings": warnings,
+            "suggestions": suggestions
+        }
+
+# --- 10. Custom Error Handling ---
 class AppError(Exception):
     def __init__(self, message, status_code=400, details=None):
         super().__init__(message)
@@ -676,13 +975,18 @@ def run_hydra_with_progress(job_id, ip, protocol, user_wl, pass_wl, timeout=None
         
         if stderr and "error" in stderr.lower():
             result_dict = {"status": "error", "message": f"Hydra Error: {stderr}"}
+            error_translation = ErrorTranslator.translate_hydra_error(stderr)
+            result_dict.update(error_translation)
+            JobManager.update_job_progress(job_id, 100, error_translation["user_message"][:100], "error")
         else: 
-            credentials_found = "login:" in stdout.lower() if stdout else False
-            if credentials_found:
-                result_dict = {"status": "success", "data": stdout, "credentials_found": True}
-                JobManager.update_job_progress(job_id, 100, "Credentials found!", "done")
+            # Parse and format Hydra output
+            parsed_result = ResultParser.parse_hydra_output(stdout, stderr)
+            result_dict = {"status": "success"}
+            result_dict.update(parsed_result)
+            
+            if parsed_result["credentials_found"]:
+                JobManager.update_job_progress(job_id, 100, f"Found {len(parsed_result['successful_logins'])} credentials!", "done")
             else:
-                result_dict = {"status": "success", "data": "No credentials found.", "credentials_found": False}
                 JobManager.update_job_progress(job_id, 100, "Attack completed - no credentials found", "done")
             
     except subprocess.TimeoutExpired:
@@ -700,15 +1004,17 @@ def run_hydra_with_progress(job_id, ip, protocol, user_wl, pass_wl, timeout=None
         raise TimeoutRetryableError(f"Hydra process timed out after {timeout} seconds")
         
     except FileNotFoundError as e:
-        result_dict = {"status": "error", "message": f"Hydra binary not found. Please ensure hydra is installed."}
-        JobManager.update_job_progress(job_id, 100, "Hydra binary not found", "error")
+        error_translation = ErrorTranslator.translate_hydra_error("Hydra binary not found")
+        result_dict = {"status": "error", "message": "Hydra binary not found"}
+        result_dict.update(error_translation)
+        JobManager.update_job_progress(job_id, 100, error_translation["user_message"][:100], "error")
         enhanced_logger.log_operation_failure(
             "Hydra Attack",
             getattr(g, 'user_context', {'api_key_id': 'System'}),
-            "Hydra binary not found",
+            error_translation["user_message"],
             f"Job ID: {job_id} | Error: {e}"
         )
-        raise AppError(result_dict["message"])
+        raise AppError(error_translation["user_message"])
         
     except Exception as e:
         result_dict = {"status": "error", "message": f"An unexpected error occurred: {e}"}
@@ -755,12 +1061,18 @@ def run_exploit_with_progress(job_id, ip, module, timeout=None):
         JobManager.update_job_progress(job_id, 20, "Connecting to Metasploit RPC")
         result = scanner.execute_exploit(ip, module, app.config['MSF_PASSWORD'], timeout=timeout)
         
+        # Parse and format Metasploit output
+        parsed_result = ResultParser.parse_metasploit_output(result)
+        result.update(parsed_result)
+        
         if result.get('status') == 'success':
-            JobManager.update_job_progress(job_id, 100, "Exploit executed successfully", "done")
+            JobManager.update_job_progress(job_id, 100, parsed_result["summary"], "done")
         elif result.get('status') == 'timeout':
-            JobManager.update_job_progress(job_id, 100, "Exploit timed out", "done")
+            JobManager.update_job_progress(job_id, 100, parsed_result["summary"], "done")
         else:
-            JobManager.update_job_progress(job_id, 100, "Exploit failed", "error")
+            error_translation = ErrorTranslator.translate_metasploit_error(result.get('message', 'Unknown error'))
+            result.update(error_translation)
+            JobManager.update_job_progress(job_id, 100, error_translation["user_message"][:100], "error")
             
     except Exception as e:
         result = {"status": "error", "message": f"Exploit execution failed: {e}"}
@@ -913,6 +1225,15 @@ def run_camera_scan_in_background(job_id, network_cidr):
 @app.route('/')
 def index(): return render_template('kam_grbs5.html')
 
+@app.route('/dashboard')
+def dashboard(): 
+    """Serve the enhanced dashboard with charts and progress visualization"""
+    try:
+        with open('dashboard.html', 'r') as f:
+            return f.read()
+    except FileNotFoundError:
+        return render_template('kam_grbs5.html')
+
 @app.route('/api/scan_network', methods=['POST'])
 @require_api_key
 def api_scan_network():
@@ -934,22 +1255,46 @@ def api_test_credentials():
 @app.route('/api/hydra_attack', methods=['POST'])
 @require_api_key
 def api_hydra_attack():
-    data = request.get_json()
+    data = request.get_json() or {}
+    
+    # Validate parameters with detailed guidance
+    validation = ParameterValidator.validate_hydra_params(data)
+    
+    if not validation["valid"]:
+        return jsonify({
+            "error": "Parameter validation failed",
+            "validation_errors": validation["errors"],
+            "warnings": validation["warnings"],
+            "suggestions": validation["suggestions"],
+            "help": {
+                "description": "Hydra brute force attack against authentication services",
+                "required_parameters": {
+                    "ip": "Target IP address (e.g., '192.168.1.10')",
+                    "protocol": "Service protocol (ssh, ftp, or http-get)",
+                    "username_wordlist": "Usernames separated by newlines",
+                    "password_wordlist": "Passwords separated by newlines"
+                },
+                "optional_parameters": {
+                    "timeout": "Attack timeout in seconds (default: 300)",
+                    "priority": "Job priority 1-10 (default: 5)"
+                },
+                "example_request": {
+                    "ip": "192.168.1.10",
+                    "protocol": "ssh",
+                    "username_wordlist": "admin\\nroot\\nuser",
+                    "password_wordlist": "password\\n123456\\nadmin",
+                    "timeout": 300
+                }
+            }
+        }), 400
+    
+    # Extract and validate parameters
     ip = validate_scope(validate_ip(data.get('ip')))
     protocol = data.get('protocol')
-    if protocol not in ['ssh', 'ftp', 'http-get']: 
-        raise AppError("Invalid protocol")
-    
     user_wl = data.get('username_wordlist', '')
     pass_wl = data.get('password_wordlist', '')
     timeout = data.get('timeout', app.config['HYDRA_TIMEOUT_SECONDS'])
     priority = data.get('priority', 5)
-    
-    # Validate that we have wordlists
-    if not user_wl.strip():
-        raise AppError("Username wordlist is required")
-    if not pass_wl.strip():
-        raise AppError("Password wordlist is required")
     
     job_id = secrets.token_hex(16)
     JobManager.create_job(job_id, g.api_key_identifier, 'hydra_attack', priority)
@@ -960,13 +1305,61 @@ def api_hydra_attack():
         f"Target: {ip} | Protocol: {protocol} | Timeout: {timeout}s"
     )
     
+    response = {
+        "job_id": job_id, 
+        "status": "queued", 
+        "message": "Hydra attack job created successfully",
+        "attack_details": {
+            "target": ip,
+            "protocol": protocol,
+            "username_count": len([u for u in user_wl.split('\n') if u.strip()]),
+            "password_count": len([p for p in pass_wl.split('\n') if p.strip()]),
+            "estimated_duration": f"~{timeout} seconds maximum"
+        }
+    }
+    
+    # Include warnings and suggestions if present
+    if validation["warnings"]:
+        response["warnings"] = validation["warnings"]
+    if validation["suggestions"]:
+        response["suggestions"] = validation["suggestions"]
+    
     executor.submit(run_hydra_with_progress, job_id, ip, protocol, user_wl, pass_wl, timeout)
-    return jsonify({"job_id": job_id, "status": "queued", "message": "Hydra attack job created successfully"}), 202
+    return jsonify(response), 202
 
 @app.route('/api/execute_exploit', methods=['POST'])
 @require_api_key
 def api_execute_exploit():
-    data = request.get_json()
+    data = request.get_json() or {}
+    
+    # Validate parameters with detailed guidance
+    validation = ParameterValidator.validate_metasploit_params(data)
+    
+    if not validation["valid"]:
+        return jsonify({
+            "error": "Parameter validation failed",
+            "validation_errors": validation["errors"],
+            "warnings": validation["warnings"],
+            "suggestions": validation["suggestions"],
+            "help": {
+                "description": "Execute Metasploit exploits against vulnerable targets",
+                "required_parameters": {
+                    "ip": "Target IP address (e.g., '192.168.1.10')",
+                    "module": "Exploit module path (e.g., 'exploit/unix/ftp/vsftpd_234_backdoor')"
+                },
+                "optional_parameters": {
+                    "timeout": "Exploit timeout in seconds (default: 60)",
+                    "priority": "Job priority 1-10 (default: 5)"
+                },
+                "example_request": {
+                    "ip": "192.168.1.10",
+                    "module": "exploit/unix/ftp/vsftpd_234_backdoor",
+                    "timeout": 60
+                },
+                "available_modules": list(app.config['WHITELISTED_MODULES'])
+            }
+        }), 400
+    
     ip = validate_scope(validate_ip(data.get('ip')))
     module = validate_module(data.get('module'))
     timeout = data.get('timeout', app.config['MSF_SESSION_TIMEOUT_SECONDS'])
@@ -981,8 +1374,26 @@ def api_execute_exploit():
         f"Target: {ip} | Module: {module} | Timeout: {timeout}s"
     )
     
+    response = {
+        "job_id": job_id, 
+        "status": "queued", 
+        "message": "Metasploit exploit job created successfully",
+        "exploit_details": {
+            "target": ip,
+            "module": module,
+            "timeout": timeout,
+            "expected_outcome": "Remote session if target is vulnerable"
+        }
+    }
+    
+    # Include warnings and suggestions if present
+    if validation["warnings"]:
+        response["warnings"] = validation["warnings"]
+    if validation["suggestions"]:
+        response["suggestions"] = validation["suggestions"]
+    
     executor.submit(run_exploit_with_progress, job_id, ip, module, timeout)
-    return jsonify({"job_id": job_id, "status": "queued", "message": "Metasploit exploit job created successfully"}), 202
+    return jsonify(response), 202
 
 @app.route('/api/scan_cameras', methods=['POST'])
 @require_api_key
@@ -1148,6 +1559,224 @@ def list_attack_modules():
         "available_modules": attack_framework.get_available_modules(),
         "total_modules": len(attack_framework.modules)
     })
+
+@app.route('/api/jobs/<job_id>/progress-chart', methods=['GET'])
+@require_api_key
+def get_job_progress_chart(job_id):
+    """Get job progress data formatted for chart visualization"""
+    job = get_db().execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if not job: raise AppError("Job not found", 404)
+    if job['owner_key'] != g.api_key_identifier: raise AppError("Forbidden", 403)
+    
+    # Generate progress chart data
+    progress_data = {
+        "job_id": job_id,
+        "type": "progress",
+        "data": {
+            "labels": ["Queued", "In Progress", "Completed"],
+            "datasets": [{
+                "label": "Job Progress",
+                "data": [0 if job['status'] == 'queued' else 100, 
+                        job['progress'] if job['status'] == 'running' else (0 if job['status'] == 'queued' else 100),
+                        100 if job['status'] in ['done', 'error', 'cancelled'] else 0],
+                "backgroundColor": ["#ffc107", "#007bff", "#28a745" if job['status'] == 'done' else "#dc3545"],
+                "borderColor": ["#e0a800", "#0056b3", "#1e7e34" if job['status'] == 'done' else "#bd2130"],
+                "borderWidth": 2
+            }]
+        },
+        "options": {
+            "responsive": True,
+            "plugins": {
+                "title": {
+                    "display": True,
+                    "text": f"Job Progress: {job['type']}"
+                }
+            },
+            "scales": {
+                "y": {
+                    "beginAtZero": True,
+                    "max": 100
+                }
+            }
+        }
+    }
+    
+    return jsonify(progress_data)
+
+@app.route('/api/jobs/<job_id>/results-chart', methods=['GET'])
+@require_api_key
+def get_job_results_chart(job_id):
+    """Get job results data formatted for chart visualization"""
+    job = get_db().execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if not job: raise AppError("Job not found", 404)
+    if job['owner_key'] != g.api_key_identifier: raise AppError("Forbidden", 403)
+    
+    if not job['result'] or job['status'] not in ['done', 'error']:
+        return jsonify({
+            "job_id": job_id,
+            "type": "results",
+            "message": "Job not completed yet or no results available"
+        })
+    
+    try:
+        result = json.loads(job['result'])
+    except (json.JSONDecodeError, TypeError):
+        result = {"status": "error", "message": "Could not parse results"}
+    
+    chart_data = {"job_id": job_id, "type": "results"}
+    
+    if job['type'] == 'hydra_attack':
+        successful_logins = result.get('successful_logins', [])
+        total_attempts = result.get('total_attempts', 0)
+        
+        chart_data.update({
+            "data": {
+                "labels": ["Successful", "Failed"],
+                "datasets": [{
+                    "label": "Attack Results",
+                    "data": [len(successful_logins), max(0, total_attempts - len(successful_logins))],
+                    "backgroundColor": ["#28a745", "#dc3545"],
+                    "borderColor": ["#1e7e34", "#bd2130"],
+                    "borderWidth": 2
+                }]
+            },
+            "options": {
+                "responsive": True,
+                "plugins": {
+                    "title": {
+                        "display": True,
+                        "text": f"Hydra Attack Results - {len(successful_logins)} credentials found"
+                    }
+                }
+            },
+            "summary": {
+                "credentials_found": len(successful_logins),
+                "total_attempts": total_attempts,
+                "success_rate": f"{(len(successful_logins) / max(1, total_attempts)) * 100:.1f}%"
+            }
+        })
+    
+    elif job['type'] == 'metasploit_exploit':
+        exploit_successful = result.get('exploit_successful', False)
+        
+        chart_data.update({
+            "data": {
+                "labels": ["Success", "Failed"],
+                "datasets": [{
+                    "label": "Exploit Results",
+                    "data": [1 if exploit_successful else 0, 0 if exploit_successful else 1],
+                    "backgroundColor": ["#28a745" if exploit_successful else "#dc3545"],
+                    "borderColor": ["#1e7e34" if exploit_successful else "#bd2130"],
+                    "borderWidth": 2
+                }]
+            },
+            "options": {
+                "responsive": True,
+                "plugins": {
+                    "title": {
+                        "display": True,
+                        "text": f"Exploit Result: {'Success' if exploit_successful else 'Failed'}"
+                    }
+                }
+            },
+            "summary": {
+                "exploit_successful": exploit_successful,
+                "session_id": result.get('session_info', {}).get('session_id'),
+                "execution_time": result.get('execution_time_seconds', 0)
+            }
+        })
+    
+    elif job['type'] == 'camera_scan':
+        camera_count = result.get('camera_count', 0)
+        cameras_found = result.get('cameras_found', False)
+        
+        chart_data.update({
+            "data": {
+                "labels": ["Cameras Found", "No Cameras"],
+                "datasets": [{
+                    "label": "Camera Scan Results",
+                    "data": [camera_count, 1 if not cameras_found else 0],
+                    "backgroundColor": ["#007bff", "#6c757d"],
+                    "borderColor": ["#0056b3", "#5a6268"],
+                    "borderWidth": 2
+                }]
+            },
+            "options": {
+                "responsive": True,
+                "plugins": {
+                    "title": {
+                        "display": True,
+                        "text": f"Camera Scan - {camera_count} cameras discovered"
+                    }
+                }
+            },
+            "summary": {
+                "cameras_found": camera_count,
+                "scan_successful": cameras_found
+            }
+        })
+    
+    else:
+        chart_data.update({
+            "message": f"Chart visualization not available for job type: {job['type']}"
+        })
+    
+    return jsonify(chart_data)
+
+@app.route('/api/dashboard/statistics-chart', methods=['GET'])
+@require_api_key
+def get_dashboard_statistics_chart():
+    """Get user's job statistics formatted for dashboard charts"""
+    stats = JobManager.get_job_statistics(g.api_key_identifier)
+    
+    if not stats:
+        return jsonify({
+            "type": "dashboard",
+            "message": "No job statistics available"
+        })
+    
+    chart_data = {
+        "type": "dashboard",
+        "data": {
+            "labels": list(stats.keys()),
+            "datasets": [{
+                "label": "Job Status Distribution",
+                "data": list(stats.values()),
+                "backgroundColor": [
+                    "#007bff",  # queued
+                    "#ffc107",  # running  
+                    "#28a745",  # done
+                    "#dc3545",  # error
+                    "#6c757d"   # cancelled
+                ],
+                "borderColor": [
+                    "#0056b3",
+                    "#e0a800", 
+                    "#1e7e34",
+                    "#bd2130",
+                    "#5a6268"
+                ],
+                "borderWidth": 2
+            }]
+        },
+        "options": {
+            "responsive": True,
+            "plugins": {
+                "title": {
+                    "display": True,
+                    "text": "Your Job Statistics"
+                }
+            }
+        },
+        "summary": {
+            "total_jobs": sum(stats.values()),
+            "active_jobs": stats.get('queued', 0) + stats.get('running', 0),
+            "completed_jobs": stats.get('done', 0),
+            "failed_jobs": stats.get('error', 0)
+        }
+    }
+    
+    return jsonify(chart_data)
 
 def kill_process_tree(pid):
     """Kill a process and all its children."""
