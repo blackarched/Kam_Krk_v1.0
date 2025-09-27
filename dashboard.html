@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeonHack Enhanced Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+        .job-card {
+            transition: transform 0.2s;
+            border-left: 4px solid #007bff;
+        }
+        .job-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .status-badge {
+            font-size: 0.8em;
+        }
+        .progress-container {
+            position: relative;
+        }
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        .error-details {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .result-summary {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">🚀 NeonHack Enhanced Dashboard</a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text" id="apiKeyDisplay">API Key: Loading...</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Dashboard Statistics -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">📊 Job Statistics Dashboard</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="chart-container">
+                                    <canvas id="dashboardChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div id="dashboardSummary" class="result-summary">
+                                    <h6>Summary</h6>
+                                    <div id="summaryContent">Loading statistics...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attack Interface -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">🎯 Unified Attack Interface</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="attackForm">
+                            <div class="mb-3">
+                                <label for="attackType" class="form-label">Attack Type</label>
+                                <select class="form-select" id="attackType" required>
+                                    <option value="">Select attack type...</option>
+                                    <option value="hydra_attack">Hydra Brute Force</option>
+                                    <option value="metasploit_exploit">Metasploit Exploit</option>
+                                    <option value="camera_scan">Camera Scan</option>
+                                    <option value="network_scan">Network Scan</option>
+                                </select>
+                            </div>
+                            
+                            <div id="attackParameters"></div>
+                            
+                            <button type="submit" class="btn btn-primary" id="launchAttack">
+                                🚀 Launch Attack
+                            </button>
+                        </form>
+                        
+                        <div id="attackFeedback" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">📋 Attack Modules</h5>
+                    </div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                        <div id="modulesList">Loading modules...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Jobs List -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">📝 Active Jobs</h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="refreshJobs()">
+                                🔄 Refresh
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="cleanupJobs()">
+                                🧹 Cleanup
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="jobsList">Loading jobs...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Details Modal -->
+    <div class="modal fade" id="jobModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="jobModalTitle">Job Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="jobModalContent">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_KEY = 'change-this-insecure-default-key'; // Replace with your API key
+        const API_BASE = 'http://localhost:5000/api';
+        
+        // Global variables
+        let dashboardChart = null;
+        let jobCharts = {};
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('apiKeyDisplay').textContent = `API Key: ${API_KEY.substring(0, 8)}...`;
+            loadDashboard();
+            loadAttackModules();
+            loadJobs();
+            
+            // Setup attack type change handler
+            document.getElementById('attackType').addEventListener('change', updateAttackParameters);
+            
+            // Setup form submission
+            document.getElementById('attackForm').addEventListener('submit', launchAttack);
+            
+            // Auto-refresh jobs every 5 seconds
+            setInterval(loadJobs, 5000);
+            setInterval(loadDashboard, 10000);
+        });
+        
+        // API Helper function
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            const options = {
+                method,
+                headers: {
+                    'X-API-Key': API_KEY,
+                    'Content-Type': 'application/json'
+                }
+            };
+            
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                return await response.json();
+            } catch (error) {
+                console.error('API call failed:', error);
+                return { error: 'Network error occurred' };
+            }
+        }
+        
+        // Load dashboard statistics
+        async function loadDashboard() {
+            const data = await apiCall('/dashboard/statistics-chart');
+            
+            if (data.error) {
+                document.getElementById('summaryContent').innerHTML = `<div class="text-danger">Error: ${data.error}</div>`;
+                return;
+            }
+            
+            if (data.message) {
+                document.getElementById('summaryContent').innerHTML = `<div class="text-muted">${data.message}</div>`;
+                return;
+            }
+            
+            // Update summary
+            const summary = data.summary;
+            document.getElementById('summaryContent').innerHTML = `
+                <div><strong>Total Jobs:</strong> ${summary.total_jobs}</div>
+                <div><strong>Active:</strong> ${summary.active_jobs}</div>
+                <div><strong>Completed:</strong> ${summary.completed_jobs}</div>
+                <div><strong>Failed:</strong> ${summary.failed_jobs}</div>
+            `;
+            
+            // Update chart
+            const ctx = document.getElementById('dashboardChart').getContext('2d');
+            
+            if (dashboardChart) {
+                dashboardChart.destroy();
+            }
+            
+            dashboardChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: data.data,
+                options: data.options
+            });
+        }
+        
+        // Load attack modules
+        async function loadAttackModules() {
+            const data = await apiCall('/attack/modules');
+            
+            if (data.error) {
+                document.getElementById('modulesList').innerHTML = `<div class="text-danger">Error: ${data.error}</div>`;
+                return;
+            }
+            
+            const modules = data.available_modules;
+            let html = '';
+            
+            for (const [name, info] of Object.entries(modules)) {
+                html += `
+                    <div class="card mb-2">
+                        <div class="card-body p-2">
+                            <h6 class="card-title mb-1">${name}</h6>
+                            <p class="card-text small mb-1">${info.description}</p>
+                            <small class="text-muted">
+                                Required: ${info.required_params.join(', ')}
+                            </small>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('modulesList').innerHTML = html;
+        }
+        
+        // Update attack parameters based on selected type
+        function updateAttackParameters() {
+            const attackType = document.getElementById('attackType').value;
+            const container = document.getElementById('attackParameters');
+            
+            if (!attackType) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            let html = '';
+            
+            if (attackType === 'hydra_attack') {
+                html = `
+                    <div class="mb-3">
+                        <label for="targetIp" class="form-label">Target IP</label>
+                        <input type="text" class="form-control" id="targetIp" placeholder="192.168.1.10" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="protocol" class="form-label">Protocol</label>
+                        <select class="form-select" id="protocol" required>
+                            <option value="ssh">SSH</option>
+                            <option value="ftp">FTP</option>
+                            <option value="http-get">HTTP</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="usernameWordlist" class="form-label">Username Wordlist</label>
+                        <textarea class="form-control" id="usernameWordlist" rows="3" placeholder="admin\nroot\nuser" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="passwordWordlist" class="form-label">Password Wordlist</label>
+                        <textarea class="form-control" id="passwordWordlist" rows="3" placeholder="password\n123456\nadmin" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="timeout" class="form-label">Timeout (seconds)</label>
+                        <input type="number" class="form-control" id="timeout" value="300" min="60" max="3600">
+                    </div>
+                `;
+            } else if (attackType === 'metasploit_exploit') {
+                html = `
+                    <div class="mb-3">
+                        <label for="targetIp" class="form-label">Target IP</label>
+                        <input type="text" class="form-control" id="targetIp" placeholder="192.168.1.10" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="module" class="form-label">Exploit Module</label>
+                        <input type="text" class="form-control" id="module" placeholder="exploit/unix/ftp/vsftpd_234_backdoor" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="timeout" class="form-label">Timeout (seconds)</label>
+                        <input type="number" class="form-control" id="timeout" value="60" min="10" max="300">
+                    </div>
+                `;
+            } else if (attackType === 'camera_scan') {
+                html = `
+                    <div class="mb-3">
+                        <label for="networkCidr" class="form-label">Network CIDR</label>
+                        <input type="text" class="form-control" id="networkCidr" placeholder="192.168.1.0/24" required>
+                    </div>
+                `;
+            } else if (attackType === 'network_scan') {
+                html = `
+                    <div class="mb-3">
+                        <label for="targetCidr" class="form-label">Target CIDR</label>
+                        <input type="text" class="form-control" id="targetCidr" placeholder="192.168.1.0/24" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="interface" class="form-label">Network Interface</label>
+                        <input type="text" class="form-control" id="interface" placeholder="eth0" required>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        // Launch attack
+        async function launchAttack(event) {
+            event.preventDefault();
+            
+            const attackType = document.getElementById('attackType').value;
+            const feedback = document.getElementById('attackFeedback');
+            
+            // Collect parameters
+            const parameters = {};
+            const form = event.target;
+            
+            for (const element of form.elements) {
+                if (element.type !== 'submit' && element.type !== 'button' && element.id !== 'attackType') {
+                    if (element.id === 'targetIp') parameters.target_ip = element.value;
+                    else if (element.id === 'networkCidr') parameters.network_cidr = element.value;
+                    else if (element.id === 'targetCidr') parameters.target_cidr = element.value;
+                    else if (element.id === 'usernameWordlist') parameters.username_wordlist = element.value;
+                    else if (element.id === 'passwordWordlist') parameters.password_wordlist = element.value;
+                    else parameters[element.id] = element.value;
+                }
+            }
+            
+            // Launch attack
+            const data = await apiCall('/attack', 'POST', {
+                attack_type: attackType,
+                parameters: parameters,
+                priority: 3
+            });
+            
+            if (data.error) {
+                feedback.innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>Error:</strong> ${data.error}
+                        ${data.validation_errors ? '<hr>' + JSON.stringify(data.validation_errors, null, 2) : ''}
+                        ${data.help ? '<hr><strong>Help:</strong> ' + JSON.stringify(data.help, null, 2) : ''}
+                    </div>
+                `;
+            } else {
+                feedback.innerHTML = `
+                    <div class="alert alert-success">
+                        <strong>Success!</strong> ${data.message}<br>
+                        <strong>Job ID:</strong> ${data.job_id}
+                        ${data.warnings ? '<hr><strong>Warnings:</strong> ' + JSON.stringify(data.warnings, null, 2) : ''}
+                        ${data.suggestions ? '<hr><strong>Suggestions:</strong> ' + JSON.stringify(data.suggestions, null, 2) : ''}
+                    </div>
+                `;
+                
+                // Reset form and refresh jobs
+                form.reset();
+                document.getElementById('attackParameters').innerHTML = '';
+                setTimeout(loadJobs, 1000);
+            }
+        }
+        
+        // Load jobs
+        async function loadJobs() {
+            const data = await apiCall('/jobs?limit=20');
+            
+            if (data.error) {
+                document.getElementById('jobsList').innerHTML = `<div class="text-danger">Error: ${data.error}</div>`;
+                return;
+            }
+            
+            const jobs = data.jobs || [];
+            let html = '';
+            
+            if (jobs.length === 0) {
+                html = '<div class="text-muted text-center py-4">No jobs found</div>';
+            } else {
+                for (const job of jobs) {
+                    const statusColor = getStatusColor(job.status);
+                    const progress = job.progress || 0;
+                    
+                    html += `
+                        <div class="job-card card mb-3">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-md-3">
+                                        <h6 class="mb-1">${job.type}</h6>
+                                        <small class="text-muted">${job.id.substring(0, 8)}...</small>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <span class="badge ${statusColor} status-badge">${job.status}</span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="progress-container">
+                                            <div class="progress">
+                                                <div class="progress-bar ${getProgressColor(job.status)}" 
+                                                     style="width: ${progress}%"></div>
+                                            </div>
+                                            <div class="progress-text">${progress}%</div>
+                                        </div>
+                                        <small class="text-muted">${job.progress_message || 'No message'}</small>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <small class="text-muted">
+                                            ${new Date(job.created_at).toLocaleString()}
+                                        </small>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                onclick="showJobDetails('${job.id}')">
+                                            📊 Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            document.getElementById('jobsList').innerHTML = html;
+        }
+        
+        // Show job details with charts
+        async function showJobDetails(jobId) {
+            const modal = new bootstrap.Modal(document.getElementById('jobModal'));
+            const modalTitle = document.getElementById('jobModalTitle');
+            const modalContent = document.getElementById('jobModalContent');
+            
+            modalTitle.textContent = `Job Details: ${jobId.substring(0, 8)}...`;
+            modalContent.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div> Loading...</div>';
+            
+            modal.show();
+            
+            // Load job details
+            const [jobData, progressChart, resultsChart] = await Promise.all([
+                apiCall(`/job_status/${jobId}`),
+                apiCall(`/jobs/${jobId}/progress-chart`),
+                apiCall(`/jobs/${jobId}/results-chart`)
+            ]);
+            
+            let html = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Job Information</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>ID:</strong></td><td>${jobData.id}</td></tr>
+                            <tr><td><strong>Type:</strong></td><td>${jobData.type}</td></tr>
+                            <tr><td><strong>Status:</strong></td><td><span class="badge ${getStatusColor(jobData.status)}">${jobData.status}</span></td></tr>
+                            <tr><td><strong>Progress:</strong></td><td>${jobData.progress || 0}%</td></tr>
+                            <tr><td><strong>Message:</strong></td><td>${jobData.progress_message || 'N/A'}</td></tr>
+                            <tr><td><strong>Created:</strong></td><td>${new Date(jobData.created_at).toLocaleString()}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Progress Chart</h6>
+                        <div class="chart-container" style="height: 200px;">
+                            <canvas id="progressChart_${jobId}"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (resultsChart.data) {
+                html += `
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <h6>Results Chart</h6>
+                            <div class="chart-container" style="height: 200px;">
+                                <canvas id="resultsChart_${jobId}"></canvas>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Results Summary</h6>
+                            <div class="result-summary">
+                                ${JSON.stringify(resultsChart.summary || {}, null, 2)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (jobData.result) {
+                html += `
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6>Full Results</h6>
+                            <div class="error-details">
+                                <pre class="bg-light p-3 rounded">${JSON.stringify(jobData.result, null, 2)}</pre>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            modalContent.innerHTML = html;
+            
+            // Create charts
+            setTimeout(() => {
+                if (progressChart.data) {
+                    const ctx = document.getElementById(`progressChart_${jobId}`).getContext('2d');
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: progressChart.data,
+                        options: progressChart.options
+                    });
+                }
+                
+                if (resultsChart.data) {
+                    const ctx = document.getElementById(`resultsChart_${jobId}`).getContext('2d');
+                    new Chart(ctx, {
+                        type: 'pie',
+                        data: resultsChart.data,
+                        options: resultsChart.options
+                    });
+                }
+            }, 100);
+        }
+        
+        // Utility functions
+        function getStatusColor(status) {
+            switch (status) {
+                case 'queued': return 'bg-warning';
+                case 'running': return 'bg-primary';
+                case 'done': return 'bg-success';
+                case 'error': return 'bg-danger';
+                case 'cancelled': return 'bg-secondary';
+                default: return 'bg-secondary';
+            }
+        }
+        
+        function getProgressColor(status) {
+            switch (status) {
+                case 'queued': return 'bg-warning';
+                case 'running': return 'bg-primary';
+                case 'done': return 'bg-success';
+                case 'error': return 'bg-danger';
+                default: return 'bg-secondary';
+            }
+        }
+        
+        // Refresh and cleanup functions
+        function refreshJobs() {
+            loadJobs();
+            loadDashboard();
+        }
+        
+        async function cleanupJobs() {
+            const data = await apiCall('/jobs/cleanup', 'POST');
+            
+            if (data.error) {
+                alert(`Cleanup failed: ${data.error}`);
+            } else {
+                alert(`Cleanup successful: ${data.deleted_jobs} jobs removed`);
+                loadJobs();
+                loadDashboard();
+            }
+        }
+    </script>
+</body>
+</html>
